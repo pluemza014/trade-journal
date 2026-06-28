@@ -1,0 +1,2320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trade Journal</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f0f11;
+    --surface: #18181c;
+    --surface2: #1f1f25;
+    --surface3: #27272e;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #f0eff4;
+    --muted: #888799;
+    --accent: #7c6fe0;
+    --accent-hover: #9488e8;
+    --green: #22c87a;
+    --red: #e84040;
+    --green-bg: rgba(34,200,122,0.12);
+    --red-bg: rgba(232,64,64,0.12);
+    --amber: #f5a623;
+    --amber-bg: rgba(245,166,35,0.12);
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
+  
+  /* Layout */
+  .sidebar { position: fixed; top: 0; left: 0; width: 220px; height: 100vh; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 50; }
+  .main { margin-left: 220px; min-height: 100vh; padding: 2rem; }
+  
+  /* Sidebar */
+  .sidebar-logo { padding: 1.25rem 1.25rem 1rem; border-bottom: 1px solid var(--border); }
+  .sidebar-logo h1 { font-size: 16px; font-weight: 600; letter-spacing: -.02em; }
+  .sidebar-logo span { font-size: 11px; color: var(--muted); }
+  .sidebar-nav { flex: 1; padding: .75rem 0; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: .6rem 1.25rem; color: var(--muted); cursor: pointer; font-size: 13px; transition: all .15s; border-left: 2px solid transparent; }
+  .nav-item:hover { color: var(--text); background: var(--surface2); }
+  .nav-item.active { color: var(--text); background: var(--surface2); border-left-color: var(--accent); }
+  .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .sidebar-account { padding: 1rem 1.25rem; border-top: 1px solid var(--border); }
+  .account-balance { font-size: 18px; font-weight: 600; letter-spacing: -.02em; }
+  .account-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  
+  /* KPI Cards */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.1rem 1.25rem; }
+  .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: .5rem; }
+  .kpi-value { font-size: 24px; font-weight: 600; letter-spacing: -.03em; line-height: 1; }
+  .kpi-sub { font-size: 11px; color: var(--muted); margin-top: .4rem; }
+  .kpi-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 500; margin-top: 4px; }
+  .up { color: var(--green); }
+  .down { color: var(--red); }
+  
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; }
+  .card-title { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 1rem; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+  
+  /* Table */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { padding: .6rem .75rem; text-align: left; color: var(--muted); font-weight: 400; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  tbody td { padding: .65rem .75rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: var(--surface2); }
+  
+  /* Badges */
+  .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+  .badge-long { background: var(--green-bg); color: var(--green); }
+  .badge-short { background: var(--red-bg); color: var(--red); }
+  .badge-win { background: var(--green-bg); color: var(--green); }
+  .badge-loss { background: var(--red-bg); color: var(--red); }
+  .badge-be { background: var(--amber-bg); color: var(--amber); }
+  .badge-open { background: rgba(124,111,224,0.15); color: var(--accent); }
+  .badge-tag { background: var(--surface3); color: var(--muted); margin-right: 3px; }
+  
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: .45rem .9rem; border-radius: var(--radius); border: 1px solid var(--border2); background: none; color: var(--text); font-size: 13px; cursor: pointer; transition: all .15s; white-space: nowrap; }
+  .btn:hover { background: var(--surface2); border-color: var(--border2); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-danger { background: var(--red-bg); border-color: transparent; color: var(--red); }
+  .btn-danger:hover { background: rgba(232,64,64,0.2); }
+  .btn-sm { padding: .3rem .65rem; font-size: 12px; }
+  .btn-group { display: flex; gap: .5rem; }
+  
+  /* Modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); backdrop-filter: blur(4px); z-index: 200; display: flex; align-items: flex-start; justify-content: center; padding-top: 4rem; overflow-y: auto; }
+  .modal { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius-lg); width: min(700px, 95vw); padding: 1.75rem; }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+  .modal-header h2 { font-size: 17px; font-weight: 600; }
+  .modal-close { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 22px; line-height: 1; padding: 0; }
+  .modal-close:hover { color: var(--text); }
+  
+  /* Form */
+  .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; }
+  .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .field input, .field select, .field textarea {
+    background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius);
+    color: var(--text); font-size: 13px; padding: .5rem .7rem; width: 100%; outline: none; transition: border-color .15s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+  .field textarea { height: 70px; resize: vertical; font-family: inherit; }
+  .field select option { background: var(--surface2); }
+  
+  /* Tags */
+  .tag-pill { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 20px; font-size: 12px; cursor: pointer; border: 1px solid var(--border2); background: var(--surface2); color: var(--muted); transition: all .15s; user-select: none; }
+  .tag-pill:hover { border-color: var(--accent); color: var(--text); }
+  .tag-pill.active { background: rgba(124,111,224,0.15); border-color: var(--accent); color: var(--accent); }
+  .tag-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+  
+  /* Rules */
+  .rule-item { display: flex; align-items: center; gap: .75rem; padding: .55rem 0; border-bottom: 1px solid var(--border); }
+  .rule-item:last-child { border-bottom: none; }
+  .rule-item input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); }
+  .rule-item label { font-size: 13px; color: var(--text); cursor: pointer; flex: 1; }
+  
+  /* Progress bar */
+  .prog-track { height: 6px; border-radius: 3px; background: var(--surface3); overflow: hidden; }
+  .prog-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+  
+  /* Section header */
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+  .section-header h2 { font-size: 18px; font-weight: 600; }
+  
+  /* Tabs */
+  .filter-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1rem; }
+  
+  /* Topbar */
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.75rem; }
+  .topbar h2 { font-size: 20px; font-weight: 600; letter-spacing: -.02em; }
+  
+  /* Settings */
+  .settings-section { margin-bottom: 2rem; }
+  .settings-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 1rem; padding-bottom: .5rem; border-bottom: 1px solid var(--border); }
+  .settings-row { display: flex; align-items: center; justify-content: space-between; padding: .65rem 0; border-bottom: 1px solid var(--border); gap: 1rem; }
+  .settings-row:last-child { border-bottom: none; }
+  .settings-row label { font-size: 13px; }
+  .settings-row input, .settings-row select { background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius); color: var(--text); font-size: 13px; padding: .4rem .6rem; width: 140px; outline: none; }
+  
+  /* Period filter */
+  .period-tabs { display: flex; gap: 4px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 3px; }
+  .period-btn { padding: .3rem .75rem; border-radius: 5px; border: none; background: none; color: var(--muted); font-size: 12px; cursor: pointer; transition: all .15s; white-space: nowrap; }
+  .period-btn:hover { color: var(--text); }
+  .period-btn.active { background: var(--surface3); color: var(--text); font-weight: 500; }
+
+  /* Calendar */
+  .cal-wrap { overflow-x: auto; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; min-width: 560px; }
+  .cal-header { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; min-width: 560px; margin-bottom: 2px; }
+  /* 7-column layout: Sun Mon Tue Wed Thu Fri + Week summary (Sat replaced) */
+  .cal-header-8 { display: grid; grid-template-columns: repeat(6, 1fr) 175px; gap: 2px; min-width: 640px; margin-bottom: 2px; }
+  .cal-row      { display: grid; grid-template-columns: repeat(6, 1fr) 175px; gap: 2px; min-width: 640px; margin-bottom: 2px; }
+  .cal-day-label { text-align: center; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: .4rem 0; }
+  .cal-cell { min-height: 72px; background: var(--surface2); border-radius: 6px; padding: .4rem .5rem; position: relative; border: 1px solid transparent; transition: border-color .15s; cursor: default; }
+  .cal-cell:hover { border-color: var(--border2); }
+  .cal-cell.today { border-color: var(--accent) !important; }
+  .cal-cell.empty { background: transparent; border: none; }
+  .cal-cell.has-trades { cursor: pointer; }
+  .cal-cell:not(.empty):not(.win-day):not(.loss-day):not(.be-day):hover { background: var(--surface3); }
+  .cal-cell:not(.empty):not(.win-day):not(.loss-day):not(.be-day):hover .cal-date { color: var(--text); }
+  .cal-cell.win-day { background: rgba(34,200,122,0.1); }
+  .cal-cell.loss-day { background: rgba(232,64,64,0.1); }
+  .cal-cell.be-day { background: rgba(245,166,35,0.08); }
+  .cal-date { font-size: 11px; color: var(--muted); font-weight: 500; }
+  .cal-pnl { font-size: 13px; font-weight: 700; margin-top: 4px; line-height: 1.2; }
+  .cal-disc { font-size: 10px; margin-top: 3px; }
+  .cal-trades { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  /* Period highlight on calendar */
+  .cal-cell.in-period { outline: 1.5px solid rgba(124,111,224,0.45); outline-offset: -1px; }
+  .cal-cell.in-period:not(.win-day):not(.loss-day):not(.be-day) { background: rgba(124,111,224,0.07); }
+  .cal-week-summary.in-period { outline: 2px solid var(--accent); outline-offset: -1px; background: rgba(124,111,224,0.12) !important; border-left-color: var(--accent) !important; }
+  .cal-week-summary.cws-win.in-period  { background: rgba(34,200,122,0.15) !important; outline-color: var(--green); border-left-color: var(--green) !important; }
+  .cal-week-summary.cws-loss.in-period { background: rgba(232,64,64,0.15) !important; outline-color: var(--red); border-left-color: var(--red) !important; }
+  .cal-week-summary { background: var(--surface3); border-radius: 6px; padding: .65rem .85rem; display: flex; flex-direction: column; gap: 4px; border-left: 4px solid var(--border2); }
+  .cal-week-summary.cws-win  { background: rgba(34,200,122,0.1); border-left-color: var(--green); }
+  .cal-week-summary.cws-loss { background: rgba(232,64,64,0.1);  border-left-color: var(--red); }
+  .cal-week-empty { opacity: .4; }
+  .cws-label { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+  .cws-date  { font-size: 12px; color: var(--muted); font-weight: 600; min-height: 16px; }
+  .cws-pnl   { font-size: 17px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+  .cws-meta  { font-size: 11px; color: var(--muted); }
+  .cws-disc  { font-size: 11px; font-weight: 600; margin-top: 3px; }
+
+  /* Monthly summary bar */
+  .cal-month-summary { margin-top: 8px; border-radius: var(--radius-lg); padding: 1rem 1.25rem; border: 1px solid var(--border); }
+
+  /* View toggle */
+  .view-toggle { display: flex; gap: 2px; background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius); padding: 3px; }
+  .view-btn { display: flex; align-items: center; justify-content: center; width: 30px; height: 26px; border-radius: 5px; border: none; background: none; color: var(--muted); cursor: pointer; transition: all .15s; }
+
+  /* Day picker */
+  .day-picker-list { display: flex; flex-direction: column; gap: 6px; margin-top: .75rem; }
+  .day-picker-item { display: flex; align-items: center; justify-content: space-between; padding: .7rem 1rem; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; transition: all .15s; }
+  .day-picker-item:hover { border-color: var(--border2); background: var(--surface3); }
+  .dpi-symbol { font-size: 14px; font-weight: 700; }
+  .dpi-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* Multi-trade session tabs */
+  .trade-tabs { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 0; margin-bottom: 1rem; border-bottom: 1px solid var(--border); flex-wrap: nowrap; }
+  .trade-tab { padding: .45rem 1rem; border-radius: var(--radius) var(--radius) 0 0; border: 1px solid transparent; border-bottom: none; background: none; color: var(--muted); font-size: 13px; cursor: pointer; white-space: nowrap; transition: all .15s; position: relative; bottom: -1px; display: flex; align-items: center; gap: 6px; }
+  .trade-tab:hover { color: var(--text); background: var(--surface2); }
+  .trade-tab.active { background: var(--surface); color: var(--text); border-color: var(--border); border-bottom-color: var(--surface); }
+  .trade-tab.tab-loss { --tab-dot: var(--red); }
+  .trade-tab.tab-win  { --tab-dot: var(--green); }
+  .trade-tab.tab-be   { --tab-dot: var(--amber); }
+  .tab-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tab-dot, var(--muted)); flex-shrink: 0; }
+  .tab-close { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 0; margin-left: 2px; }
+  .tab-close:hover { color: var(--red); }
+  .add-trade-tab { padding: .45rem .8rem; border-radius: var(--radius) var(--radius) 0 0; border: 1px dashed var(--border2); border-bottom: none; background: none; color: var(--muted); font-size: 13px; cursor: pointer; white-space: nowrap; position: relative; bottom: -1px; }
+  .add-trade-tab:hover { color: var(--text); }
+  .view-btn:hover { color: var(--text); }
+  .view-btn.active { background: var(--surface3); color: var(--text); }
+
+  /* Card / box view */
+  .trade-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+  .trade-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.1rem 1.25rem; transition: border-color .15s; }
+  .trade-card:hover { border-color: var(--border2); }
+  .trade-card.win  { border-left: 3px solid var(--green); }
+  .trade-card.loss { border-left: 3px solid var(--red); }
+  .trade-card.be   { border-left: 3px solid var(--amber); }
+  .trade-card.open { border-left: 3px solid var(--accent); }
+  .tc-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: .75rem; }
+  .tc-symbol { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
+  .tc-date { font-size: 11px; color: var(--muted); }
+  .tc-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .5rem; margin-bottom: .75rem; }
+  .tc-stat { background: var(--surface2); border-radius: var(--radius); padding: .45rem .6rem; }
+  .tc-stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 2px; }
+  .tc-stat-value { font-size: 13px; font-weight: 600; }
+  .tc-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: .75rem; }
+  .tc-notes { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: .75rem; white-space: pre-line; border-left: 2px solid var(--surface3); padding-left: .6rem; }
+  .tc-footer { display: flex; align-items: center; justify-content: space-between; }
+  .tc-rules { display: flex; gap: 3px; }
+  .tc-rule-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+  /* Sparkline */
+  .chart-container { position: relative; height: 140px; }
+  
+  /* Toast */
+  .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--surface3); border: 1px solid var(--border2); border-radius: var(--radius); padding: .75rem 1rem; font-size: 13px; z-index: 999; animation: slideIn .2s ease; }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  
+  /* Rule log table rotated headers */
+  .rule-th { white-space: nowrap; font-size: 10px; font-weight: 400; color: var(--muted); padding: .5rem .5rem !important; max-width: 120px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+  /* Account selector */
+  .acct-selector { padding: .6rem .75rem; border-bottom: 1px solid var(--border); position: relative; }
+  .acct-btn { display: flex; align-items: center; justify-content: space-between; width: 100%; background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius); padding: .45rem .65rem; cursor: pointer; color: var(--text); gap: .5rem; }
+  .acct-btn:hover { border-color: var(--accent); }
+  .acct-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  .acct-name { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 500; font-family: monospace; letter-spacing: .02em; }
+  .acct-dropdown { position: absolute; top: calc(100% + 2px); left: .75rem; right: .75rem; background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius); z-index: 200; box-shadow: 0 8px 24px rgba(0,0,0,.4); overflow: hidden; }
+  .acct-option { display: flex; align-items: center; gap: .6rem; padding: .55rem .75rem; cursor: pointer; font-size: 11px; border-bottom: 1px solid var(--border); }
+  .acct-option:last-child { border-bottom: none; }
+  .acct-option:hover { background: var(--surface3); }
+  .acct-option.active { background: rgba(124,111,224,0.12); color: var(--accent); }
+  .acct-option-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: monospace; }
+  .acct-option-actions { display: flex; gap: 3px; opacity: 0; flex-shrink: 0; }
+  .acct-option:hover .acct-option-actions { opacity: 1; }
+  .acct-action-btn { background: none; border: 1px solid var(--border2); border-radius: 3px; color: var(--muted); cursor: pointer; font-size: 10px; padding: 1px 5px; line-height: 1.5; }
+  .acct-action-btn:hover { color: var(--text); }
+  .acct-action-btn.del:hover { color: var(--red); border-color: var(--red); }
+  .acct-add-row { display: flex; align-items: center; gap: .5rem; padding: .55rem .75rem; cursor: pointer; font-size: 12px; color: var(--accent); background: none; border: none; width: 100%; border-top: 1px solid var(--border); }
+  .acct-add-row:hover { background: rgba(124,111,224,0.08); }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 3px; }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .form-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 640px) {
+    .sidebar { width: 100%; height: auto; position: relative; }
+    .main { margin-left: 0; padding: 1rem; }
+    .kpi-grid { grid-template-columns: 1fr 1fr; }
+    .form-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <h1>📈 Trade Journal</h1>
+    <span id="sidebar-version">v1.0</span>
+  </div>
+  <!-- Account selector -->
+  <div class="acct-selector" id="acct-selector-wrap">
+    <button class="acct-btn" onclick="toggleAcctDropdown(event)" id="acct-btn">
+      <span class="acct-dot"></span>
+      <span class="acct-name" id="acct-btn-label">Loading…</span>
+      <span class="acct-chevron">▼</span>
+    </button>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-item active" onclick="switchTab('dashboard')" id="nav-dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item" onclick="switchTab('journal')" id="nav-journal">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      Journal
+    </div>
+    <div class="nav-item" onclick="switchTab('rules')" id="nav-rules">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Rules
+    </div>
+    <div class="nav-item" onclick="switchTab('settings')" id="nav-settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
+    </div>
+  </nav>
+  <div class="sidebar-account">
+    <div class="account-label">Account balance</div>
+    <div class="account-balance" id="sidebar-balance">—</div>
+    <div id="sync-badge" style="font-size:10px;margin-top:4px;letter-spacing:.03em">● Connecting…</div>
+  </div>
+</div>
+
+<main class="main" id="main-content"></main>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modal-box"></div>
+</div>
+
+<script>
+// ─── DATA LAYER (server-backed) ───────────────────────────────────────────────
+const STORAGE_KEY     = 'tradejournal_v2';
+const ACCOUNTS_KEY    = 'tradejournal_accounts';
+
+const DEFAULT_SETTINGS = {
+  accountSize: 10000,
+  currency: 'USD',
+  defaultRisk: 1,
+  riskReward: '2',
+  instruments: ['EUR/USD','GBP/USD','BTC/USD','AAPL','ES1!','NQ1!','GBP/JPY'],
+  rules: [
+    'Followed my trading plan',
+    'Waited for confirmation signal',
+    'Respected my stop loss',
+    'No revenge trading',
+    'Trade fits my strategy criteria',
+    'Risk within allowed limit',
+  ],
+  tags: ['Breakout','Reversal','Trend','Scalp','Swing','News','Gap','Range','Pullback'],
+};
+
+function makeDefaultAccountData() {
+  return { settings: JSON.parse(JSON.stringify(DEFAULT_SETTINGS)), trades: [], nextId: 1 };
+}
+
+// ─── SERVER API ───────────────────────────────────────────────────────────────
+const API = window.location.origin; // e.g. http://192.168.1.x:3000
+let _serverAvailable = true;
+
+async function apiLoad() {
+  try {
+    const r = await fetch(`${API}/api/data`);
+    if (!r.ok) throw new Error('not ok');
+    return await r.json();
+  } catch(e) {
+    _serverAvailable = false;
+    return null;
+  }
+}
+
+async function apiSave(store) {
+  if (!_serverAvailable) { lsSave(store); return; }
+  try {
+    await fetch(`${API}/api/data`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(store),
+    });
+    lsSave(store); // also mirror to localStorage as backup
+  } catch(e) {
+    lsSave(store);
+  }
+}
+
+function lsSave(store) {
+  try { localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(store)); } catch(e) {}
+}
+function lsLoad() {
+  try {
+    const r = localStorage.getItem(ACCOUNTS_KEY);
+    if (r) return JSON.parse(r);
+    // migrate old single-account
+    const old = localStorage.getItem(STORAGE_KEY);
+    if (old) {
+      const d = JSON.parse(old);
+      return { accounts: [{ id: 'ACCOUNT-1', name: 'ACCOUNT-1', data: d }], activeId: 'ACCOUNT-1' };
+    }
+  } catch(e) {}
+  return null;
+}
+
+// ─── ACCOUNT STORE ────────────────────────────────────────────────────────────
+let accountStore = lsLoad() || { accounts: [{ id: 'ACCOUNT-1', name: 'ACCOUNT-1', data: makeDefaultAccountData() }], activeId: 'ACCOUNT-1' };
+
+// Load from server on startup (async)
+(async () => {
+  const serverStore = await apiLoad();
+  if (serverStore && serverStore.accounts && serverStore.accounts.length) {
+    accountStore = serverStore;
+    lsSave(accountStore);
+    data = getActiveAccount().data;
+    render();
+    renderAcctBtn();
+    showSyncBadge('synced');
+  } else if (!_serverAvailable) {
+    showSyncBadge('offline');
+  }
+})();
+
+// ─── REAL-TIME SSE SYNC ───────────────────────────────────────────────────────
+let _lastSaveTs = 0;
+function connectSSE() {
+  const sse = new EventSource(`${API}/api/events`);
+  sse.addEventListener('update', async (e) => {
+    const { ts } = JSON.parse(e.data);
+    if (ts <= _lastSaveTs) return; // ignore echoes of our own save
+    const fresh = await apiLoad();
+    if (!fresh) return;
+    accountStore = fresh;
+    data = getActiveAccount().data;
+    lsSave(accountStore);
+    render();
+    renderAcctBtn();
+    showSyncBadge('synced');
+  });
+  sse.onerror = () => { showSyncBadge('offline'); };
+  sse.onopen  = () => { showSyncBadge('synced'); };
+}
+connectSSE();
+
+function showSyncBadge(state) {
+  const el = document.getElementById('sync-badge');
+  if (!el) return;
+  if (state === 'synced')  { el.textContent = '● Synced';  el.style.color = 'var(--green)'; }
+  if (state === 'offline') { el.textContent = '● Offline'; el.style.color = 'var(--amber)'; }
+  if (state === 'saving')  { el.textContent = '● Saving…'; el.style.color = 'var(--muted)'; }
+}
+
+function getActiveAccount() {
+  return accountStore.accounts.find(a => a.id === accountStore.activeId) || accountStore.accounts[0];
+}
+let data = getActiveAccount().data;
+
+async function save() {
+  _lastSaveTs = Date.now();
+  showSyncBadge('saving');
+  await apiSave(accountStore);
+  showSyncBadge('synced');
+}
+
+function switchAccount(id) {
+  accountStore.activeId = id;
+  data = getActiveAccount().data;
+  save();
+  render();
+  renderAcctBtn();
+  closeAcctDropdown();
+}
+
+function addAccount(name) {
+  const id = name.trim().toUpperCase().replace(/\s+/g,'-') || `ACCOUNT-${accountStore.accounts.length+1}`;
+  if (accountStore.accounts.find(a => a.id === id)) { toast('Account ID already exists'); return; }
+  accountStore.accounts.push({ id, name: id, data: makeDefaultAccountData() });
+  switchAccount(id);
+}
+
+function renameAccount(id, newName) {
+  const acct = accountStore.accounts.find(a => a.id === id);
+  if (!acct) return;
+  const newId = newName.trim().toUpperCase().replace(/\s+/g,'-');
+  if (!newId) return;
+  acct.id = newId; acct.name = newId;
+  if (accountStore.activeId === id) accountStore.activeId = newId;
+  data = getActiveAccount().data;
+  save(); render(); renderAcctBtn(); closeAcctDropdown();
+}
+
+function deleteAccount(id) {
+  if (accountStore.accounts.length <= 1) { toast('Cannot delete the only account'); return; }
+  accountStore.accounts = accountStore.accounts.filter(a => a.id !== id);
+  if (accountStore.activeId === id) accountStore.activeId = accountStore.accounts[0].id;
+  data = getActiveAccount().data;
+  save(); render(); renderAcctBtn(); closeAcctDropdown();
+}
+
+function resetData() {
+  if (!confirm('Reset this account\'s data?')) return;
+  getActiveAccount().data = makeDefaultAccountData();
+  data = getActiveAccount().data;
+  save(); render(); toast('Account data reset');
+}
+
+// ─── ACCOUNT SELECTOR UI ─────────────────────────────────────────────────────
+let acctDropdownOpen = false;
+
+function renderAcctBtn() {
+  const acct = getActiveAccount();
+  const label = document.getElementById('acct-btn-label');
+  if (label) label.textContent = acct?.id || '—';
+}
+
+function toggleAcctDropdown(e) {
+  e.stopPropagation();
+  acctDropdownOpen = !acctDropdownOpen;
+  const wrap = document.getElementById('acct-selector-wrap');
+  const existing = document.getElementById('acct-dropdown');
+  if (existing) existing.remove();
+  if (!acctDropdownOpen) return;
+
+  const dd = document.createElement('div');
+  dd.className = 'acct-dropdown'; dd.id = 'acct-dropdown';
+  const activeId = accountStore.activeId;
+
+  accountStore.accounts.forEach(acct => {
+    const row = document.createElement('div');
+    row.className = 'acct-option' + (acct.id === activeId ? ' active' : '');
+    row.innerHTML = `
+      <span class="acct-dot" style="background:${acct.id===activeId?'var(--green)':'var(--muted)'}"></span>
+      <span class="acct-option-name">${acct.id}</span>
+      <span class="acct-option-actions">
+        <button class="acct-action-btn" onclick="event.stopPropagation();promptRenameAccount('${acct.id}')" title="Rename">✎</button>
+        <button class="acct-action-btn del" onclick="event.stopPropagation();deleteAccount('${acct.id}')" title="Delete">✕</button>
+      </span>`;
+    row.addEventListener('click', () => switchAccount(acct.id));
+    dd.appendChild(row);
+  });
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'acct-add-row';
+  addBtn.innerHTML = '＋ Add account';
+  addBtn.onclick = e => { e.stopPropagation(); promptAddAccount(); };
+  dd.appendChild(addBtn);
+  wrap.appendChild(dd);
+}
+
+function closeAcctDropdown() {
+  acctDropdownOpen = false;
+  document.getElementById('acct-dropdown')?.remove();
+}
+
+function promptAddAccount() {
+  closeAcctDropdown();
+  const id = prompt('Enter account ID (e.g. EXPRESS-V2-DLL-166431):');
+  if (id && id.trim()) addAccount(id.trim());
+}
+
+function promptRenameAccount(id) {
+  closeAcctDropdown();
+  const newName = prompt('Rename account ID:', id);
+  if (newName && newName.trim() && newName.trim() !== id) renameAccount(id, newName.trim());
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', () => {
+  if (acctDropdownOpen) closeAcctDropdown();
+});
+
+let activeTab = 'dashboard';
+let filterTag = null;
+let journalView = localStorage.getItem('tj_view') || 'row';
+let dashPeriod = 'month';   // 'week' | '2weeks' | '3weeks' | 'month'
+let rulesPeriod = 'month';
+let logPeriod = 'month';    // period for trade-by-trade log
+let chartInstances = {};
+
+// ─── STATS ────────────────────────────────────────────────────────────────────
+function calcStats() {
+  const closed = data.trades.filter(t => t.status === 'Closed');
+  const wins = closed.filter(t => t.outcome === 'Win');
+  const losses = closed.filter(t => t.outcome === 'Loss');
+  const bes = closed.filter(t => t.outcome === 'BE');
+  const totalPnl = closed.reduce((s, t) => s + (t.pnl || 0), 0);
+  const winRate = closed.length ? wins.length / closed.length : 0;
+  const avgWin = wins.length ? wins.reduce((s,t)=>s+t.pnl,0)/wins.length : 0;
+  const avgLoss = losses.length ? Math.abs(losses.reduce((s,t)=>s+t.pnl,0)/losses.length) : 0;
+  const profitFactor = (avgLoss && losses.length) ? (avgWin * wins.length) / (avgLoss * losses.length) : 0;
+  const expectancy = closed.length ? totalPnl / closed.length : 0;
+  const maxDD = calcMaxDD(closed);
+  return { closed, wins, losses, bes, totalPnl, winRate, avgWin, avgLoss, profitFactor, expectancy, maxDD };
+}
+
+function calcMaxDD(trades) {
+  let peak = data.settings.accountSize, eq = data.settings.accountSize, maxDD = 0;
+  [...trades].sort((a,b) => a.date.localeCompare(b.date)).forEach(t => {
+    eq += (t.pnl || 0);
+    if (eq > peak) peak = eq;
+    const dd = (peak - eq) / peak;
+    if (dd > maxDD) maxDD = dd;
+  });
+  return maxDD;
+}
+
+function equityCurve() {
+  const closed = [...data.trades].filter(t => t.status === 'Closed').sort((a,b)=>a.date.localeCompare(b.date));
+  let eq = data.settings.accountSize;
+  const pts = [{ x: 'Start', y: eq }];
+  closed.forEach(t => { eq += (t.pnl || 0); pts.push({ x: t.date, y: +eq.toFixed(2) }); });
+  return pts;
+}
+
+function monthlyPnl() {
+  const by = {};
+  data.trades.filter(t=>t.status==='Closed').forEach(t=>{
+    const m = t.date.slice(0,7);
+    by[m] = (by[m]||0) + (t.pnl||0);
+  });
+  const months = Object.keys(by).sort();
+  return { labels: months.map(m=>{ const [y,mo]=m.split('-'); return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+mo-1]+' '+y.slice(2); }), data: months.map(m=>+by[m].toFixed(2)), raw: months.map(m=>by[m]) };
+}
+
+// ─── FORMATTERS ───────────────────────────────────────────────────────────────
+const SYM = { USD:'$', EUR:'€', GBP:'£' };
+function cur(n, abs) {
+  if (n === null || n === undefined) return '—';
+  const sym = SYM[data.settings.currency] || data.settings.currency + ' ';
+  const v = abs ? Math.abs(n) : n;
+  const neg = v < 0;
+  return (neg ? '-' : '') + sym + Math.abs(v).toLocaleString(undefined, {minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function pct(n) { return (n*100).toFixed(1)+'%'; }
+function fmt(n, d=2) { return n !== null && n !== undefined ? n.toFixed(d) : '—'; }
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('nav-'+tab)?.classList.add('active');
+  render();
+}
+
+function render() {
+  // Destroy old charts
+  Object.values(chartInstances).forEach(c => { try { c.destroy(); } catch(e){} });
+  chartInstances = {};
+
+  const s = calcStats();
+  const eq = equityCurve();
+  const totalGain = eq.length > 1 ? eq[eq.length-1].y - eq[0].y : 0;
+  const currentBalance = data.settings.accountSize + totalGain;
+
+  document.getElementById('sidebar-balance').textContent = cur(currentBalance);
+
+  const main = document.getElementById('main-content');
+
+  if (activeTab === 'dashboard') main.innerHTML = renderDashboard(s);
+  else if (activeTab === 'journal') main.innerHTML = renderJournal();
+  else if (activeTab === 'rules') main.innerHTML = renderRules(s);
+  else if (activeTab === 'settings') main.innerHTML = renderSettings();
+
+  // Charts after DOM paint
+  requestAnimationFrame(() => {
+    if (activeTab === 'dashboard' || activeTab === 'rules') drawCharts(s);
+  });
+}
+
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
+
+function getLocalToday() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth()+1).padStart(2,'0');
+  const d = String(now.getDate()).padStart(2,'0');
+  return `${y}-${m}-${d}`;
+}
+
+function getPeriodDates(period) {
+  const today = getLocalToday();
+  const now = new Date();
+  // Use local year/month/day — never parse a date string which defaults to UTC
+  const localYear  = now.getFullYear();
+  const localMonth = now.getMonth();
+  const localDay   = now.getDate();
+  const dow        = now.getDay(); // 0=Sun … 6=Sat (local)
+
+  function localDateStr(y, m, d) {
+    return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  }
+  function offsetDate(offsetDays) {
+    const d = new Date(localYear, localMonth, localDay + offsetDays);
+    return localDateStr(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  let from;
+  if (period === 'week') {
+    // Start of this week = last Sunday (or today if Sunday)
+    from = offsetDate(-dow);
+  } else if (period === '2weeks') {
+    from = offsetDate(-13);
+  } else if (period === '3weeks') {
+    from = offsetDate(-20);
+  } else { // month
+    from = `${localYear}-${String(localMonth+1).padStart(2,'0')}-01`;
+  }
+  return { from, to: today };
+}
+
+function filterByPeriod(trades, period) {
+  const { from, to } = getPeriodDates(period);
+  return trades.filter(t => t.date >= from && t.date <= to);
+}
+
+function periodLabel(period) {
+  return { week: 'This week', '2weeks': 'Last 2 weeks', '3weeks': 'Last 3 weeks', month: 'This month' }[period];
+}
+
+function renderPeriodFilter(current, fn) {
+  return `<div class="period-tabs">
+    ${['week','2weeks','3weeks','month'].map(p =>
+      `<button class="period-btn ${current===p?'active':''}" onclick="${fn}('${p}')">${periodLabel(p)}</button>`
+    ).join('')}
+  </div>`;
+}
+
+function calcDisciplineStats(trades) {
+  const closed = trades.filter(t => t.status === 'Closed' && t.rules?.length);
+  const totalRuleSlots = closed.reduce((s,t) => s + t.rules.length, 0);
+  const totalFollowed  = closed.reduce((s,t) => s + t.rules.filter(Boolean).length, 0);
+  const overallPct = totalRuleSlots ? Math.round(totalFollowed / totalRuleSlots * 100) : null;
+
+  const ruleBreakdown = data.settings.rules.map((rule, i) => {
+    const applicable = closed.filter(t => t.rules[i] !== undefined);
+    const followed   = applicable.filter(t => t.rules[i] === true).length;
+    return { rule, total: applicable.length, followed, pct: applicable.length ? Math.round(followed / applicable.length * 100) : null };
+  });
+
+  const allFollowed = closed.filter(t => t.rules.every(Boolean));
+  const notFollowed = closed.filter(t => !t.rules.every(Boolean));
+  const wrAll = allFollowed.length ? allFollowed.filter(t=>t.outcome==='Win').length / allFollowed.length : null;
+  const wrNot = notFollowed.length ? notFollowed.filter(t=>t.outcome==='Win').length / notFollowed.length : null;
+
+  const last10 = [...closed].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10).reverse();
+  const trendPts = last10.map(t => ({
+    date: t.date,
+    score: Math.round(t.rules.filter(Boolean).length / t.rules.length * 100),
+  }));
+
+  const worstRule = [...ruleBreakdown].filter(r=>r.total>0).sort((a,b)=>a.pct-b.pct)[0] || null;
+
+  return { overallPct, ruleBreakdown, allFollowed, notFollowed, wrAll, wrNot, trendPts, worstRule };
+}
+
+// ─── CALENDAR STATE ───────────────────────────────────────────────────────────
+const _now = new Date();
+let calViewYear  = _now.getFullYear();
+let calViewMonth = _now.getMonth(); // 0-indexed
+
+let calNavMode = false; // true when user has navigated away from period-synced month
+
+function calNav(dir) {
+  calViewMonth += dir;
+  if (calViewMonth > 11) { calViewMonth = 0;  calViewYear++; }
+  if (calViewMonth < 0)  { calViewMonth = 11; calViewYear--; }
+  calNavMode = true;
+  rerenderCalendarOnly();
+  updateDashKPIs();
+}
+function calGoToday() {
+  const n = new Date();
+  calViewYear  = n.getFullYear();
+  calViewMonth = n.getMonth();
+  calNavMode = false;
+  rerenderCalendarOnly();
+  updateDashKPIs();
+}function calJump() {
+  const sel = document.getElementById('cal-jump');
+  if (!sel) return;
+  const [y, m] = sel.value.split('-');
+  calViewYear  = parseInt(y);
+  calViewMonth = parseInt(m) - 1;
+  calNavMode = true;
+  rerenderCalendarOnly();
+  updateDashKPIs();
+}
+
+function updateDashKPIs() {
+  const kpiWrap = document.getElementById('dash-kpi-grid');
+  const lowerWrap = document.getElementById('dash-lower-sections');
+  if (!kpiWrap) return;
+
+  const mpfx = `${calViewYear}-${String(calViewMonth+1).padStart(2,'0')}`;
+  const monthTrades = data.trades.filter(t => t.status==='Closed' && t.date.startsWith(mpfx));
+  const s2 = calcStatsFor(monthTrades);
+  const d2 = calcDisciplineStats(monthTrades);
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const label = `${MONTHS[calViewMonth]} ${calViewYear}`;
+  const sc = d2.overallPct===null?'var(--muted)':d2.overallPct>=80?'var(--green)':d2.overallPct>=60?'var(--amber)':'var(--red)';
+
+  kpiWrap.innerHTML = `
+    <div class="kpi" style="border-left:3px solid ${sc}">
+      <div class="kpi-label">Discipline score</div>
+      <div class="kpi-value" style="color:${sc}">${d2.overallPct!==null?d2.overallPct+'%':'—'}</div>
+      <div class="kpi-sub">${label} · ${s2.closed.length} trades</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Net P&L</div>
+      <div class="kpi-value ${s2.totalPnl>=0?'up':'down'}">${cur(s2.totalPnl)}</div>
+      <div class="kpi-sub">${s2.wins.length}W / ${s2.losses.length}L</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Win rate (all rules ✓)</div>
+      <div class="kpi-value ${d2.wrAll!==null?(d2.wrAll>=.5?'up':'down'):''}">${d2.wrAll!==null?pct(d2.wrAll):'—'}</div>
+      <div class="kpi-sub">${d2.allFollowed.length} fully compliant trades</div>
+    </div>
+    <div class="kpi" style="border-left:3px solid var(--red)">
+      <div class="kpi-label">Most broken rule</div>
+      <div class="kpi-value down" style="font-size:14px;line-height:1.3">${d2.worstRule?d2.worstRule.pct+'%':'—'}</div>
+      <div class="kpi-sub">${d2.worstRule?d2.worstRule.rule:'No data yet'}</div>
+    </div>`;
+
+  if (lowerWrap) {
+    // Destroy existing chart before re-rendering
+    if (chartInstances['discipline']) { try { chartInstances['discipline'].destroy(); } catch(e){} delete chartInstances['discipline']; }
+    lowerWrap.innerHTML = renderDashLowerSections(d2, monthTrades, sc);
+    requestAnimationFrame(() => drawCharts(calcStats()));
+  }
+}
+
+function calcStatsFor(trades) {
+  const closed = trades;
+  const wins   = closed.filter(t=>t.outcome==='Win');
+  const losses = closed.filter(t=>t.outcome==='Loss');
+  const totalPnl = closed.reduce((s,t)=>s+(t.outcome==='Loss'?-Math.abs(t.pnl||0):Math.abs(t.pnl||0)),0);
+  return { closed, wins, losses, totalPnl };
+}
+function renderRuleLogBody(monthOverride) {
+  // If monthOverride provided (YYYY-MM), show that month; else use logPeriod filter
+  let logTrades;
+  if (monthOverride) {
+    logTrades = data.trades.filter(t => t.status==='Closed' && t.date.startsWith(monthOverride));
+  } else {
+    logTrades = filterByPeriod(data.trades, logPeriod).filter(t => t.status==='Closed');
+  }
+  if (!logTrades.length) return `<p style="color:var(--muted);font-size:13px">No closed trades in this period.</p>`;
+  return `<div class="table-wrap">
+    <table style="table-layout:auto">
+      <thead><tr>
+        <th style="white-space:nowrap">Date</th>
+        <th>Symbol</th>
+        <th>P&L</th>
+        <th>Result</th>
+        ${data.settings.rules.map(rule=>`<th class="rule-th" title="${rule}">${rule}</th>`).join('')}
+        <th style="white-space:nowrap">Score</th>
+      </tr></thead>
+      <tbody>
+        ${[...logTrades].sort((a,b)=>b.date.localeCompare(a.date)).map(t => {
+          const dp = t.rules?.length ? Math.round(t.rules.filter(Boolean).length/t.rules.length*100) : null;
+          const dc = dp===null?'var(--muted)':dp>=80?'var(--green)':dp>=60?'var(--amber)':'var(--red)';
+          const p  = pnlFromOutcome(t);
+          return `<tr>
+            <td style="color:var(--muted);white-space:nowrap">${t.date}</td>
+            <td style="font-weight:600">${t.symbol}</td>
+            <td style="color:${p.color};font-weight:500;white-space:nowrap">${p.display}</td>
+            <td><span class="badge badge-${(t.outcome||'open').toLowerCase()}">${t.outcome||'Open'}</span></td>
+            ${data.settings.rules.map((_,i)=>`
+              <td style="text-align:center;padding:.5rem .4rem">
+                ${t.rules?.[i]===true
+                  ? `<span style="color:var(--green);font-size:15px;font-weight:700">✓</span>`
+                  : t.rules?.[i]===false
+                  ? `<span style="color:var(--red);font-size:15px;font-weight:700">✗</span>`
+                  : `<span style="color:var(--muted)">—</span>`}
+              </td>`).join('')}
+            <td><span style="font-weight:700;color:${dc}">${dp!==null?dp+'%':'—'}</span></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function rerenderCalendarOnly() {
+  const wrap = document.getElementById('cal-outer');
+  if (!wrap) return;
+  const activePeriod = activeTab === 'rules' ? rulesPeriod : dashPeriod;
+  const { from, to } = getPeriodDates(activePeriod);
+  wrap.innerHTML = buildCalendarGrid(data.trades, true, from, to);
+  const logBody = document.getElementById('rule-log-body');
+  if (logBody) {
+    const mpfx = `${calViewYear}-${String(calViewMonth+1).padStart(2,'0')}`;
+    logBody.innerHTML = renderRuleLogBody(mpfx);
+  }
+}
+
+function buildCalendarGrid(trades, hideMonthly, periodFrom, periodTo) {
+  const today   = getLocalToday();
+  const year    = calViewYear;
+  const month   = calViewMonth;
+  const firstDay = new Date(year, month, 1);
+  const lastDay  = new Date(year, month + 1, 0);
+  const MONTHS   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  // Columns: Sun Mon Tue Wed Thu Fri | Week (replaces Sat)
+  const COL_LABELS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+  // dayMap
+  const dayMap = {};
+  trades.filter(t => t.status === 'Closed').forEach(t => {
+    if (!dayMap[t.date]) dayMap[t.date] = { pnl:0, count:0, ruleSlots:0, ruleFollowed:0, ids:[], wins:0, losses:0 };
+    const signed = t.outcome==='Loss' ? -Math.abs(t.pnl||0) : Math.abs(t.pnl||0);
+    dayMap[t.date].pnl += signed;
+    dayMap[t.date].count++;
+    dayMap[t.date].ids.push(t.id);
+    if (t.outcome==='Win')  dayMap[t.date].wins++;
+    if (t.outcome==='Loss') dayMap[t.date].losses++;
+    if (t.rules?.length) {
+      dayMap[t.date].ruleSlots    += t.rules.length;
+      dayMap[t.date].ruleFollowed += t.rules.filter(Boolean).length;
+    }
+  });
+
+  // Jump options
+  const allYears = [...new Set(trades.map(t=>t.date.slice(0,4)).concat([String(year)]))].sort();
+  const minYear  = parseInt(allYears[0])||year;
+  const maxYear  = Math.max(year+1, new Date().getFullYear()+1);
+  let jumpOptions = '';
+  for (let y=minYear; y<=maxYear; y++)
+    for (let m2=0; m2<12; m2++) {
+      const val=`${y}-${String(m2+1).padStart(2,'0')}`;
+      jumpOptions += `<option value="${val}" ${(y===year&&m2===month)?'selected':''}>${MONTHS[m2]} ${y}</option>`;
+    }
+
+  // Day cell builder (Sun–Fri)
+  function dayCell(dateStr, inMonth) {
+    const dayN    = new Date(dateStr+'T00:00:00').getDate();
+    const day     = dayMap[dateStr];
+    const isToday = dateStr === today;
+    const isFut   = dateStr > today;
+    const isInPeriod = periodFrom && periodTo && dateStr >= periodFrom && dateStr <= periodTo;
+    if (!inMonth) return `<div class="cal-cell" style="opacity:.18;background:transparent"><div class="cal-date">${dayN}</div></div>`;
+    let cc = 'cal-cell'; if (isToday) cc += ' today'; if (isInPeriod) cc += ' in-period';
+    if (isFut) return `<div class="${cc}" style="opacity:.2"><div class="cal-date">${dayN}</div></div>`;
+    let ph='',dh='',th='',ca='',cs='';
+    if (day) {
+      const il=day.pnl<0, ib=(day.pnl===0&&day.count>0);
+      cc += il?' loss-day has-trades':ib?' be-day has-trades':' win-day has-trades';
+      const pc=il?'var(--red)':ib?'var(--amber)':'var(--green)';
+      ph=`<div class="cal-pnl" style="color:${pc}">${day.pnl>0?'+':''}${cur(day.pnl)}</div>`;
+      if (day.ruleSlots) {
+        const dp=Math.round(day.ruleFollowed/day.ruleSlots*100);
+        const dc=dp>=80?'var(--green)':dp>=60?'var(--amber)':'var(--red)';
+        dh=`<div class="cal-disc" style="color:${dc}">${dp}% disc.</div>`;
+      }
+      th=`<div class="cal-trades">${day.count} trade${day.count>1?'s':''}</div>`;
+      const ij=JSON.stringify(day.ids).replace(/"/g,'&quot;');
+      ca=`onclick="calClick('${dateStr}','${ij}')"`;cs='cursor:pointer;';
+    } else {
+      ca=`onclick="openModal(null,'${dateStr}')"`;cs='cursor:pointer;';
+      ph=`<div class="cal-plus" style="font-size:18px;color:var(--surface3);margin-top:12px;text-align:center;user-select:none;transition:color .15s">+</div>`;
+    }
+    return `<div class="${cc}" style="${cs}" ${ca}
+      onmouseenter="if(this.querySelector('.cal-plus'))this.querySelector('.cal-plus').style.color='var(--muted)'"
+      onmouseleave="if(this.querySelector('.cal-plus'))this.querySelector('.cal-plus').style.color='var(--surface3)'">
+      <div class="cal-date">${dayN}</div>${ph}${dh}${th}
+    </div>`;
+  }
+
+  // Week summary cell builder — uses ALL 7 days (Sun–Sat) for totals
+  function weekCell(wn, allWeekDates, inMonthDates) {
+    // Saturday is index 6 of allWeekDates (Sun=0…Sat=6)
+    const satDate    = allWeekDates[6];
+    const satDayNum  = new Date(satDate + 'T00:00:00').getDate();
+    const satInMonth = satDate >= firstOfMonth && satDate <= lastOfMonth;
+    const allAct     = allWeekDates.filter(d=>dayMap[d]);
+    const weekInPeriod = periodFrom && periodTo && allWeekDates.some(d => d >= periodFrom && d <= periodTo);
+    if (!allAct.length) {
+      const isEmpty = !inMonthDates.some(d=>d<=today);
+      return `<div class="cal-week-summary cal-week-empty ${weekInPeriod?'in-period':''}" style="${isEmpty?'opacity:.3':''}">
+        <div class="cws-date">${satInMonth ? satDayNum : ''}</div>
+        <div class="cws-pnl" style="color:var(--muted)">$0.00</div>
+        <div class="cws-meta" style="color:var(--muted)">0 trades</div>
+      </div>`;
+    }
+    const wp=allAct.reduce((s,d)=>s+dayMap[d].pnl,0);
+    const wt=allAct.reduce((s,d)=>s+dayMap[d].count,0);
+    const ww=allAct.reduce((s,d)=>s+dayMap[d].wins,0);
+    const wl=allAct.reduce((s,d)=>s+dayMap[d].losses,0);
+    const ws=allAct.reduce((s,d)=>s+dayMap[d].ruleSlots,0);
+    const wf=allAct.reduce((s,d)=>s+dayMap[d].ruleFollowed,0);
+    const disc=ws?Math.round(wf/ws*100):null;
+    const pc=wp>0?'var(--green)':wp<0?'var(--red)':'var(--muted)';
+    const dc=disc===null?'var(--muted)':disc>=80?'var(--green)':disc>=60?'var(--amber)':'var(--red)';
+    const bg=wp>0?'cws-win':wp<0?'cws-loss':'';
+    return `<div class="cal-week-summary ${bg} ${weekInPeriod?'in-period':''}">
+      <div class="cws-date">${satInMonth ? satDayNum : ''}</div>
+      <div class="cws-pnl" style="color:${pc}">${wp>0?'+':''}${cur(wp)}</div>
+      <div class="cws-meta">${wt} trade${wt>1?'s':''}</div>
+      ${disc!==null?`<div class="cws-disc" style="color:${dc}">${disc}% discipline</div>`:''}
+    </div>`;
+  }
+
+  // Build grid rows. Layout:
+  //   Col 0 = Sun (DOW 0)
+  //   Col 1 = Mon (DOW 1)
+  //   Col 2 = Tue (DOW 2)
+  //   Col 3 = Wed (DOW 3)
+  //   Col 4 = Thu (DOW 4)
+  //   Col 5 = Fri (DOW 5)
+  //   Col 6 = Week summary (Sat column replaced)
+  // Sat (DOW 6) dates are NOT shown as cells but ARE counted in week summary.
+
+  const firstOfMonth = `${year}-${String(month+1).padStart(2,'0')}-01`;
+  const lastOfMonth  = `${year}-${String(month+1).padStart(2,'0')}-${String(lastDay.getDate()).padStart(2,'0')}`;
+  // Find the Sunday of the first week (on or before the 1st)
+  const firstDow = firstDay.getDay(); // 0=Sun
+  const calStart = new Date(year, month, 1 - firstDow);
+
+  let gridRows = '';
+  let weekNum  = 1;
+  let cur_date = new Date(calStart);
+
+  while (true) {
+    const rowSunStr = cur_date.toISOString().slice(0,10);
+    if (rowSunStr > lastOfMonth) break;
+
+    // All 7 dates for this week (Sun=0 … Sat=6)
+    const week7 = [];
+    for (let i=0; i<7; i++) {
+      const d = new Date(cur_date); d.setDate(d.getDate()+i);
+      week7.push(d.toISOString().slice(0,10));
+    }
+    // DOW 0=Sun, 1=Mon…5=Fri shown as cells; DOW 6=Sat → week summary
+    let rowCells = '';
+    for (let col=0; col<=5; col++) {  // Sun(0)…Fri(5)
+      const dateStr = week7[col];
+      const inMonth = dateStr >= firstOfMonth && dateStr <= lastOfMonth;
+      rowCells += dayCell(dateStr, inMonth);
+    }
+    const inMonthDates = week7.filter(d=>d>=firstOfMonth&&d<=lastOfMonth);
+    rowCells += weekCell(weekNum, week7, inMonthDates);
+    gridRows += `<div class="cal-row">${rowCells}</div>`;
+    weekNum++;
+    cur_date.setDate(cur_date.getDate()+7);
+    if (cur_date > new Date(year, month+1, 6)) break;
+  }
+
+  // Monthly summary bar
+  const mpfx = `${year}-${String(month+1).padStart(2,'0')}`;
+  const amd  = Object.keys(dayMap).filter(d=>d.startsWith(mpfx));
+  const mP=amd.reduce((s,d)=>s+dayMap[d].pnl,0);
+  const mT=amd.reduce((s,d)=>s+dayMap[d].count,0);
+  const mW=amd.reduce((s,d)=>s+dayMap[d].wins,0);
+  const mL=amd.reduce((s,d)=>s+dayMap[d].losses,0);
+  const mS=amd.reduce((s,d)=>s+dayMap[d].ruleSlots,0);
+  const mF=amd.reduce((s,d)=>s+dayMap[d].ruleFollowed,0);
+  const mD=mS?Math.round(mF/mS*100):null;
+  const mPC=mP>0?'var(--green)':mP<0?'var(--red)':'var(--muted)';
+  const mDC=mD===null?'var(--muted)':mD>=80?'var(--green)':mD>=60?'var(--amber)':'var(--red)';
+  const mBg=mP>0?'rgba(34,200,122,0.07)':mP<0?'rgba(232,64,64,0.07)':'var(--surface2)';
+
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem">
+      <div style="display:flex;align-items:center;gap:.5rem">
+        <button class="btn btn-sm" onclick="calNav(-12)" title="Previous year">«</button>
+        <button class="btn btn-sm" onclick="calNav(-1)">‹</button>
+        <span style="font-size:16px;font-weight:700;letter-spacing:-.02em;min-width:160px;text-align:center">${MONTHS[month]} ${year}</span>
+        <button class="btn btn-sm" onclick="calNav(1)">›</button>
+        <button class="btn btn-sm" onclick="calNav(12)" title="Next year">»</button>
+        <button class="btn btn-sm" onclick="calGoToday()" style="margin-left:4px">Today</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+        <select id="cal-jump" onchange="calJump()" style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-size:12px;padding:.3rem .5rem;outline:none;cursor:pointer">${jumpOptions}</select>
+      </div>
+    </div>
+    <div class="cal-wrap">
+      <div class="cal-header-8">
+        ${COL_LABELS.slice(0,6).map(d=>`<div class="cal-day-label">${d}</div>`).join('')}
+        <div class="cal-day-label" style="color:var(--accent)">Sa</div>
+      </div>
+      ${gridRows}
+    </div>
+    ${hideMonthly ? '' : `<div class="cal-month-summary" style="background:${mBg}">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:6px;font-weight:500">Monthly total — ${MONTHS[month]} ${year}</div>
+      <div style="display:flex;gap:2rem;flex-wrap:wrap;align-items:center">
+        <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">P&L</div><div style="font-size:22px;font-weight:700;letter-spacing:-.02em;color:${mPC}">${mP>0?'+':''}${cur(mP)}</div></div>
+        <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Trades</div><div style="font-size:22px;font-weight:700;color:var(--text)">${mT}</div></div>
+        <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Win / Loss</div><div style="font-size:17px;font-weight:600"><span style="color:var(--green)">${mW}W</span> <span style="color:var(--muted)">/</span> <span style="color:var(--red)">${mL}L</span></div></div>
+        ${mD!==null?`<div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Discipline</div><div style="font-size:22px;font-weight:700;color:${mDC}">${mD}%</div></div><div style="flex:1;min-width:140px"><div style="height:6px;border-radius:3px;background:var(--surface3);overflow:hidden;margin-top:18px"><div style="height:100%;width:${mD}%;border-radius:3px;background:${mDC}"></div></div></div>`:''}
+        ${mT===0?`<span style="color:var(--muted);font-size:13px">No trades this month — click any day to log one.</span>`:''}
+      </div>
+    </div>`}
+  `;
+}
+
+function renderCalendar(trades, period, hideMonthly) {
+  const { from, to } = getPeriodDates(period || dashPeriod);
+  return `<div id="cal-outer">${buildCalendarGrid(trades, hideMonthly, from, to)}</div>`;
+}
+
+
+function renderDashboard(s) {
+  const periodTrades = filterByPeriod(data.trades, dashPeriod);
+  const ps = (() => {
+    const closed = periodTrades.filter(t=>t.status==='Closed');
+    const wins = closed.filter(t=>t.outcome==='Win');
+    const losses = closed.filter(t=>t.outcome==='Loss');
+    const totalPnl = closed.reduce((sum,t)=>sum+(t.pnl||0),0);
+    const winRate = closed.length ? wins.length/closed.length : 0;
+    return { closed, wins, losses, totalPnl, winRate };
+  })();
+  const d = calcDisciplineStats(periodTrades);
+  const scoreColor = d.overallPct === null ? 'var(--muted)' : d.overallPct >= 80 ? 'var(--green)' : d.overallPct >= 60 ? 'var(--amber)' : 'var(--red)';
+  const scoreLabel = d.overallPct === null ? '—' : d.overallPct >= 80 ? 'Excellent' : d.overallPct >= 60 ? 'Good' : 'Needs work';
+
+  return `
+    <div class="topbar">
+      <h2>Dashboard</h2>
+      <div style="display:flex;gap:.75rem;align-items:center">
+        ${renderPeriodFilter(dashPeriod, 'setDashPeriod')}
+        <button class="btn btn-primary" onclick="openModal(null)">＋ New trade</button>
+      </div>
+    </div>
+
+    <div class="kpi-grid" id="dash-kpi-grid">
+      <div class="kpi" style="border-left: 3px solid ${scoreColor}">
+        <div class="kpi-label">Discipline score</div>
+        <div class="kpi-value" style="color:${scoreColor}">${d.overallPct !== null ? d.overallPct+'%' : '—'}</div>
+        <div class="kpi-sub">${scoreLabel} · ${ps.closed.length} trades</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Net P&L</div>
+        <div class="kpi-value ${ps.totalPnl>=0?'up':'down'}">${cur(ps.totalPnl)}</div>
+        <div class="kpi-sub">${ps.wins.length}W / ${ps.losses.length}L</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Win rate (all rules ✓)</div>
+        <div class="kpi-value ${d.wrAll!==null?(d.wrAll>=.5?'up':'down'):''}">${d.wrAll!==null ? pct(d.wrAll) : '—'}</div>
+        <div class="kpi-sub">${d.allFollowed.length} fully compliant trades</div>
+      </div>
+      <div class="kpi" style="border-left: 3px solid var(--red)">
+        <div class="kpi-label">Most broken rule</div>
+        <div class="kpi-value down" style="font-size:14px;line-height:1.3">${d.worstRule ? d.worstRule.pct+'%' : '—'}</div>
+        <div class="kpi-sub">${d.worstRule ? d.worstRule.rule : 'No data yet'}</div>
+      </div>
+    </div>
+
+    <!-- Calendar card -->
+    <div class="card" style="margin-bottom:1rem">
+      ${renderCalendar(data.trades, dashPeriod, true)}
+    </div>
+
+    <div id="dash-lower-sections">
+      ${renderDashLowerSections(d, periodTrades, scoreColor)}
+    </div>
+  `;
+}
+
+function renderDashLowerSections(d, trades, scoreColor) {
+  const activePeriodLabel = calNavMode
+    ? (() => { const M=['January','February','March','April','May','June','July','August','September','October','November','December']; return M[calViewMonth]+' '+calViewYear; })()
+    : periodLabel(dashPeriod);
+  return `
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Rule compliance — ${activePeriodLabel}</div>
+        ${d.ruleBreakdown.length === 0
+          ? '<p style="color:var(--muted);font-size:13px">No rules configured.</p>'
+          : d.ruleBreakdown.map(r => {
+              const c = r.pct === null ? 'var(--muted)' : r.pct >= 80 ? 'var(--green)' : r.pct >= 60 ? 'var(--amber)' : 'var(--red)';
+              return `
+                <div style="margin-bottom:.9rem">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+                    <span style="font-size:13px">${r.rule}</span>
+                    <span style="font-size:13px;font-weight:700;color:${c};min-width:40px;text-align:right">${r.pct !== null ? r.pct+'%' : '—'}</span>
+                  </div>
+                  <div class="prog-track"><div class="prog-fill" style="width:${r.pct||0}%;background:${c}"></div></div>
+                  <div style="font-size:11px;color:var(--muted);margin-top:3px">${r.followed}/${r.total} trades</div>
+                </div>`;
+            }).join('')}
+      </div>
+
+      <div class="card">
+        <div class="card-title">Discipline trend — ${activePeriodLabel}</div>
+        <div style="position:relative;height:220px"><canvas id="chart-discipline"></canvas></div>
+        <div style="margin-top:1rem;padding-top:.9rem;border-top:1px solid var(--border);display:flex;gap:2rem;flex-wrap:wrap">
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.05em">Full compliance</div>
+            <div style="font-size:22px;font-weight:700;color:var(--green)">${d.allFollowed.length} <span style="font-size:12px;font-weight:400;color:var(--muted)">trades</span></div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.05em">Rule broken</div>
+            <div style="font-size:22px;font-weight:700;color:var(--red)">${d.notFollowed.length} <span style="font-size:12px;font-weight:400;color:var(--muted)">trades</span></div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.05em">Win rate edge</div>
+            <div style="font-size:22px;font-weight:700;color:${d.wrAll!==null&&d.wrNot!==null?(d.wrAll-d.wrNot>=0?'var(--green)':'var(--red)'):'var(--muted)'}">
+              ${d.wrAll!==null&&d.wrNot!==null ? ((d.wrAll-d.wrNot)>=0?'+':'')+((d.wrAll-d.wrNot)*100).toFixed(1)+'pp' : '—'}
+            </div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.05em">Score</div>
+            <div style="font-size:22px;font-weight:700;color:${scoreColor}">${d.overallPct !== null ? d.overallPct+'%' : '—'}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Recent trades — ${activePeriodLabel}</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Date</th><th>Symbol</th><th>Dir</th><th>P&L</th><th>Result</th><th>Discipline</th></tr></thead>
+          <tbody>
+            ${[...trades].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10).map(t => {
+              const rules = t.rules || [];
+              const dp = rules.length ? Math.round(rules.filter(Boolean).length / rules.length * 100) : null;
+              const dc = dp === null ? 'var(--muted)' : dp >= 80 ? 'var(--green)' : dp >= 60 ? 'var(--amber)' : 'var(--red)';
+              const p = pnlFromOutcome(t);
+              return `<tr>
+                <td style="color:var(--muted)">${t.date}</td>
+                <td style="font-weight:600">${t.symbol}</td>
+                <td><span class="badge badge-${t.direction.toLowerCase()}">${t.direction}</span></td>
+                <td style="color:${p.color};font-weight:500">${p.display}</td>
+                <td><span class="badge badge-${(t.outcome||'open').toLowerCase()}">${t.outcome||'Open'}</span></td>
+                <td>${dp !== null ? `
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <div style="width:60px;height:5px;border-radius:3px;background:var(--surface3);overflow:hidden">
+                      <div style="height:100%;width:${dp}%;background:${dc};border-radius:3px"></div>
+                    </div>
+                    <span style="font-size:12px;font-weight:600;color:${dc}">${dp}%</span>
+                  </div>` : '<span style="color:var(--muted)">—</span>'}
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function renderSetupDiscipline(trades) {
+  const rows = data.settings.tags.map(tag => {
+    const ts = trades.filter(t => t.tags?.includes(tag) && t.status==='Closed' && t.rules?.length);
+    if (!ts.length) return null;
+    const totalSlots = ts.reduce((s,t)=>s+t.rules.length,0);
+    const followed   = ts.reduce((s,t)=>s+t.rules.filter(Boolean).length,0);
+    const dp = Math.round(followed / totalSlots * 100);
+    const wr = ts.filter(t=>t.outcome==='Win').length / ts.length;
+    return { tag, n: ts.length, dp, wr };
+  }).filter(Boolean).sort((a,b)=>b.dp-a.dp);
+  if (!rows.length) return '<p style="color:var(--muted);font-size:13px">No tagged trades yet.</p>';
+  return rows.map(r => {
+    const c = r.dp >= 80 ? 'var(--green)' : r.dp >= 60 ? 'var(--amber)' : 'var(--red)';
+    return `<div style="margin-bottom:.9rem">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px">
+        <span style="font-weight:500">${r.tag} <span style="color:var(--muted);font-weight:400">(${r.n})</span></span>
+        <span style="font-weight:700;color:${c}">${r.dp}% discipline</span>
+      </div>
+      <div class="prog-track"><div class="prog-fill" style="width:${r.dp}%;background:${c}"></div></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:3px">${pct(r.wr)} win rate</div>
+    </div>`;
+  }).join('');
+}
+
+function drawCharts(s) {
+  const gridColor = 'rgba(255,255,255,0.05)';
+  const textColor = '#888799';
+
+  // Use month trades when user has navigated calendar, otherwise use period filter
+  let chartTrades;
+  if (calNavMode && activeTab === 'dashboard') {
+    const mpfx = `${calViewYear}-${String(calViewMonth+1).padStart(2,'0')}`;
+    chartTrades = data.trades.filter(t => t.status==='Closed' && t.date.startsWith(mpfx));
+  } else {
+    const activePeriod = activeTab === 'rules' ? rulesPeriod : dashPeriod;
+    chartTrades = filterByPeriod(data.trades, activePeriod);
+  }
+  const d = calcDisciplineStats(chartTrades);
+
+  const dCtx = document.getElementById('chart-discipline')?.getContext('2d');
+  if (dCtx && d.trendPts.length > 0) {
+
+    // Group trendPts by ISO week (Sun-start)
+    function getWeekKey(dateStr) {
+      const [y,m,day] = dateStr.split('-').map(Number);
+      const dt = new Date(y, m-1, day);
+      const dow = dt.getDay(); // 0=Sun
+      const sun = new Date(y, m-1, day - dow);
+      return `${sun.getFullYear()}-${String(sun.getMonth()+1).padStart(2,'0')}-${String(sun.getDate()).padStart(2,'0')}`;
+    }
+
+    // Build ordered list of week keys preserving order
+    const weekOrder = [];
+    const weekMap = {}; // weekKey -> [{date, score}]
+    d.trendPts.forEach(p => {
+      const wk = getWeekKey(p.date);
+      if (!weekMap[wk]) { weekMap[wk] = []; weekOrder.push(wk); }
+      weekMap[wk].push(p);
+    });
+
+    // Max trades in any week = number of datasets needed
+    const maxPerWeek = Math.max(...Object.values(weekMap).map(a => a.length));
+
+    // Build datasets: dataset[i] = i-th trade within each week
+    const datasets = [];
+    for (let i = 0; i < maxPerWeek; i++) {
+      const dataArr = weekOrder.map(wk => {
+        const trades = weekMap[wk];
+        return trades[i] ? trades[i].score : null;
+      });
+      const colors = weekOrder.map(wk => {
+        const trades = weekMap[wk];
+        const score = trades[i] ? trades[i].score : null;
+        if (score === null) return 'transparent';
+        return score >= 80 ? 'rgba(34,200,122,0.85)' :
+               score >= 60 ? 'rgba(245,166,35,0.85)' :
+                             'rgba(232,64,64,0.85)';
+      });
+      datasets.push({
+        data: dataArr,
+        backgroundColor: colors,
+        borderRadius: 5,
+        borderSkipped: false,
+        barPercentage: 0.8,
+        categoryPercentage: 0.75,
+        skipNull: true,
+      });
+    }
+
+    // Labels: show week start date
+    const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const labels = weekOrder.map(wk => {
+      const [y,m,d2] = wk.split('-').map(Number);
+      return `w/${d2}/${m}`;
+    });
+
+    chartInstances['discipline'] = new Chart(dCtx, {
+      type: 'bar',
+      data: { labels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (items) => {
+                const wk = weekOrder[items[0].dataIndex];
+                const ds = items[0].datasetIndex;
+                const pt = weekMap[wk]?.[ds];
+                return pt ? pt.date : wk;
+              },
+              label: ctx => {
+                const v = ctx.parsed.y;
+                return v !== null ? `Discipline: ${v}%` : '';
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: textColor, font:{size:10} },
+            grid: { color: gridColor },
+          },
+          y: {
+            min: 0, max: 100,
+            ticks: { color: textColor, font:{size:10}, callback: v => v+'%' },
+            grid: { color: gridColor }
+          }
+        }
+      }
+    });
+  }
+}
+
+function setDashPeriod(p) {
+  dashPeriod = rulesPeriod = logPeriod = p;
+  calNavMode = false;
+  const { from } = getPeriodDates(p);
+  const d = new Date(from + 'T00:00:00');
+  calViewYear  = d.getFullYear();
+  calViewMonth = d.getMonth();
+  render();
+}
+function setRulesPeriod(p) { setDashPeriod(p); }
+function setLogPeriod(p) {
+  // Sync log period with the main rules period
+  logPeriod = rulesPeriod = dashPeriod = p;
+  const { from } = getPeriodDates(p);
+  const d = new Date(from + 'T00:00:00');
+  calViewYear  = d.getFullYear();
+  calViewMonth = d.getMonth();
+  const logBody = document.getElementById('rule-log-body');
+  if (logBody) {
+    logBody.innerHTML = renderRuleLogBody();
+  }
+  render();
+}
+
+// ─── JOURNAL ──────────────────────────────────────────────────────────────────
+function setJournalView(v) {
+  journalView = v;
+  localStorage.setItem('tj_view', v);
+  render();
+}
+
+function renderJournal() {
+  const filtered = filterTag ? data.trades.filter(t=>t.tags?.includes(filterTag)) : data.trades;
+  const sorted = [...filtered].sort((a,b) => b.date.localeCompare(a.date));
+
+  const rowIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>`;
+  const cardIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>`;
+
+  return `
+    <div class="topbar">
+      <h2>Journal <span style="font-size:14px;color:var(--muted);font-weight:400">${sorted.length} trades</span></h2>
+      <div style="display:flex;gap:.75rem;align-items:center">
+        <div class="view-toggle">
+          <button class="view-btn ${journalView==='row'?'active':''}" onclick="setJournalView('row')" title="Row view">${rowIcon}</button>
+          <button class="view-btn ${journalView==='card'?'active':''}" onclick="setJournalView('card')" title="Card view">${cardIcon}</button>
+        </div>
+        <button class="btn btn-primary" onclick="openModal(null)">＋ New trade</button>
+      </div>
+    </div>
+    <div class="filter-tabs">
+      <span class="tag-pill ${!filterTag?'active':''}" onclick="setFilter(null)">All</span>
+      ${data.settings.tags.map(t=>`<span class="tag-pill ${filterTag===t?'active':''}" onclick="setFilter('${t}')">${t}</span>`).join('')}
+    </div>
+    ${journalView === 'card' ? renderTradeCards(sorted) : `
+      <div class="card" style="padding:0;overflow:hidden">
+        <div class="table-wrap">${renderTradeTable(sorted, false)}</div>
+      </div>
+    `}
+  `;
+}
+
+function renderTradeCards(trades) {
+  if (!trades.length) return '<p style="color:var(--muted);font-size:13px;padding:1rem 0">No trades found.</p>';
+  return `<div class="trade-cards">${trades.map(t => {
+    const outcome = (t.outcome || 'open').toLowerCase();
+    // Derive sign from outcome: Loss = always negative display, Win/BE = positive
+    const isLoss = outcome === 'loss';
+    const isBe   = outcome === 'be';
+    const rawPnl  = t.pnl !== null && t.pnl !== undefined ? Math.abs(t.pnl) : null;
+    const signedPnl = rawPnl === null ? null : isLoss ? -rawPnl : rawPnl;
+    const pnlColor = isLoss ? 'var(--red)' : isBe ? 'var(--amber)' : 'var(--green)';
+    const pnlDisplay = signedPnl === null ? '—' : (signedPnl > 0 ? '+' : '') + cur(signedPnl);
+    // Card border and stat box color based on outcome
+    const cardAccent = isLoss ? 'var(--red)' : isBe ? 'var(--amber)' : outcome === 'open' ? 'var(--accent)' : 'var(--green)';
+    const statBg = isLoss ? 'rgba(232,64,64,0.12)' : isBe ? 'rgba(245,166,35,0.08)' : outcome === 'open' ? 'rgba(124,111,224,0.1)' : 'rgba(34,200,122,0.1)';
+    const rules = t.rules || [];
+    const ruleTotal = rules.length;
+    const ruleFollowed = rules.filter(Boolean).length;
+    const rulePct = ruleTotal ? Math.round((ruleFollowed / ruleTotal) * 100) : null;
+    const ruleColor = rulePct === null ? 'var(--muted)' : rulePct >= 80 ? 'var(--green)' : rulePct >= 50 ? 'var(--amber)' : 'var(--red)';
+    const ruleTrackColor = rulePct === null ? 'var(--surface3)' : rulePct >= 80 ? 'rgba(34,200,122,0.2)' : rulePct >= 50 ? 'rgba(245,166,35,0.2)' : 'rgba(232,64,64,0.2)';
+    return `
+      <div class="trade-card ${outcome}" style="border-left-color:${cardAccent}">
+        <div class="tc-header">
+          <div>
+            <div style="font-size:16px;font-weight:700;letter-spacing:-.01em;color:var(--text)">${t.date}</div>
+            <div style="font-size:12px;font-weight:500;color:var(--muted);margin-top:3px;letter-spacing:.02em">${t.symbol}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="badge badge-${t.direction.toLowerCase()}">${t.direction}</span>
+            <span class="badge badge-${outcome}">${t.outcome || 'Open'}</span>
+          </div>
+        </div>
+        <div class="tc-stats">
+          <div class="tc-stat" style="background:${statBg}">
+            <div class="tc-stat-label">P&L</div>
+            <div class="tc-stat-value" style="color:${pnlColor}">${pnlDisplay}</div>
+          </div>
+          <div class="tc-stat">
+            <div class="tc-stat-label">R:R</div>
+            <div class="tc-stat-value">${t.rr ? t.rr.toFixed(1)+'R' : '—'}</div>
+          </div>
+          <div class="tc-stat">
+            <div class="tc-stat-label">Size</div>
+            <div class="tc-stat-value">${t.size}</div>
+          </div>
+          <div class="tc-stat">
+            <div class="tc-stat-label">Entry</div>
+            <div class="tc-stat-value">${t.entry ? fmt(t.entry, t.entry>100?0:4) : '—'}</div>
+          </div>
+          <div class="tc-stat">
+            <div class="tc-stat-label">Exit</div>
+            <div class="tc-stat-value">${t.exit ? fmt(t.exit, t.exit>100?0:4) : '—'}</div>
+          </div>
+          <div class="tc-stat">
+            <div class="tc-stat-label">Status</div>
+            <div class="tc-stat-value" style="font-size:12px">${t.status}</div>
+          </div>
+        </div>
+        ${(t.tags||[]).length ? `<div class="tc-tags">${t.tags.map(tg=>`<span class="badge badge-tag">${tg}</span>`).join('')}</div>` : ''}
+        ${t.notes ? `<div class="tc-notes">${t.notes}</div>` : ''}
+        ${ruleTotal ? `
+          <div style="margin-bottom:.75rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+              <span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)">Rule discipline</span>
+              <span style="font-size:13px;font-weight:700;color:${ruleColor}">${rulePct}%</span>
+            </div>
+            <div style="height:5px;border-radius:3px;background:${ruleTrackColor};overflow:hidden">
+              <div style="height:100%;width:${rulePct}%;border-radius:3px;background:${ruleColor};transition:width .3s"></div>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px">${ruleFollowed} of ${ruleTotal} rules followed</div>
+          </div>
+        ` : ''}
+        <div class="tc-footer">
+          <div></div>
+          <div class="btn-group">
+            <button class="btn btn-sm" onclick="openModal(${t.id})">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteTrade(${t.id})">Delete</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('')}</div>`;
+}
+
+function pnlFromOutcome(t) {
+  if (t.pnl === null || t.pnl === undefined) return { color: 'var(--muted)', display: '—' };
+  const outcome = (t.outcome || '').toLowerCase();
+  const isLoss = outcome === 'loss';
+  const isBe   = outcome === 'be';
+  const signed  = isLoss ? -Math.abs(t.pnl) : Math.abs(t.pnl);
+  const color   = isLoss ? 'var(--red)' : isBe ? 'var(--amber)' : 'var(--green)';
+  const display = (signed > 0 ? '+' : '') + cur(signed);
+  return { color, display };
+}
+
+function renderTradeTable(trades, compact) {
+  if (!trades.length) return '<p style="padding:1.5rem;color:var(--muted);font-size:13px">No trades found.</p>';
+  return `
+    <table>
+      <thead><tr>
+        <th>Date</th><th>Symbol</th><th>Dir</th><th>Entry</th><th>Exit</th>
+        ${compact?'':'<th>Size</th>'}
+        <th>P&L</th><th>R:R</th><th>Tags</th><th>Result</th>
+        ${compact?'':'<th>Actions</th>'}
+      </tr></thead>
+      <tbody>
+        ${trades.map(t => {
+          const p = pnlFromOutcome(t);
+          return `<tr>
+          <td style="color:var(--muted)">${t.date}</td>
+          <td style="font-weight:600">${t.symbol}</td>
+          <td><span class="badge badge-${t.direction.toLowerCase()}">${t.direction}</span></td>
+          <td>${fmt(t.entry, t.entry > 100 ? 0 : 4)}</td>
+          <td>${t.exit ? fmt(t.exit, t.exit > 100 ? 0 : 4) : '—'}</td>
+          ${compact?'':'<td>'+t.size+'</td>'}
+          <td style="color:${p.color};font-weight:500">${p.display}</td>
+          <td>${t.rr ? t.rr.toFixed(1)+'R' : '—'}</td>
+          <td>${(t.tags||[]).map(tg=>`<span class="badge badge-tag">${tg}</span>`).join('')}</td>
+          <td><span class="badge badge-${(t.outcome||'open').toLowerCase()}">${t.outcome||'Open'}</span></td>
+          ${compact?'':`<td><div class="btn-group">
+            <button class="btn btn-sm" onclick="openModal(${t.id})">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteTrade(${t.id})">Delete</button>
+          </div></td>`}
+        </tr>`;}).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+// ─── RULES ────────────────────────────────────────────────────────────────────
+// Also fix blankTrade date to use local date
+function getLocalDateStr() {
+  return getLocalToday();
+}
+
+function renderRules(s) {
+  const periodTrades = filterByPeriod(data.trades, rulesPeriod);
+  const closed = periodTrades.filter(t=>t.status==='Closed');
+  const allRulesFollowed = closed.filter(t=>t.rules?.every(Boolean));
+  const rulesBroken = closed.filter(t=>t.rules && !t.rules.every(Boolean));
+  const wrAll = allRulesFollowed.length ? allRulesFollowed.filter(t=>t.outcome==='Win').length/allRulesFollowed.length : 0;
+  const wrBroken = rulesBroken.length ? rulesBroken.filter(t=>t.outcome==='Win').length/rulesBroken.length : 0;
+
+  // Overall discipline score for this period
+  const totalSlots = closed.reduce((s,t)=>s+(t.rules?.length||0),0);
+  const totalFollowed = closed.reduce((s,t)=>s+(t.rules?.filter(Boolean).length||0),0);
+  const discScore = totalSlots ? Math.round(totalFollowed/totalSlots*100) : 0;
+  const discColor = discScore>=80?'var(--green)':discScore>=60?'var(--amber)':'var(--red)';
+
+  return `
+    <div class="topbar">
+      <h2>Trading rules</h2>
+      <div style="display:flex;align-items:center;gap:.75rem">
+        <span style="font-size:13px;color:var(--muted)">Showing: <strong style="color:var(--text)">${periodLabel(rulesPeriod)}</strong></span>
+        ${renderPeriodFilter(rulesPeriod, 'setRulesPeriod')}
+      </div>
+    </div>
+
+    <!-- Calendar for rules period -->
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-title">Discipline calendar</div>
+      ${renderCalendar(data.trades, rulesPeriod, true)}
+    </div>
+
+    <!-- Per-trade rule breakdown table -->
+    <div class="card" style="margin-bottom:1rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem">
+        <div class="card-title" style="margin-bottom:0">Trade-by-trade rule log</div>
+        ${renderPeriodFilter(rulesPeriod, 'setLogPeriod')}
+      </div>
+      <div id="rule-log-body">
+        ${renderRuleLogBody()}
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Rule compliance — ${periodLabel(rulesPeriod)}</div>
+        ${data.settings.rules.length === 0
+          ? '<p style="color:var(--muted);font-size:13px">No rules yet. Add them in Settings.</p>'
+          : data.settings.rules.map((rule, i) => {
+              const applicable = closed.filter(t=>t.rules?.[i]!==undefined);
+              const followed = applicable.filter(t=>t.rules[i]===true).length;
+              const ratio = applicable.length ? followed/applicable.length : 0;
+              const c = applicable.length===0?'var(--muted)':ratio>=.8?'var(--green)':ratio>=.6?'var(--amber)':'var(--red)';
+              return `
+                <div style="margin-bottom:1rem">
+                  <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px">
+                    <span>${rule}</span>
+                    <span style="color:${c};font-weight:600">${applicable.length ? Math.round(ratio*100)+'%' : '—'}</span>
+                  </div>
+                  <div class="prog-track"><div class="prog-fill" style="width:${applicable.length?ratio*100:0}%;background:${c}"></div></div>
+                  <div style="font-size:11px;color:var(--muted);margin-top:3px">${followed}/${applicable.length} trades</div>
+                </div>`;
+            }).join('')}
+      </div>
+
+      <div>
+        <div class="card" style="margin-bottom:1rem">
+          <div class="card-title">Overall discipline score</div>
+          <div style="font-size:48px;font-weight:700;letter-spacing:-.04em;color:${discColor};line-height:1">
+            ${discScore}<span style="font-size:22px;color:var(--muted)">/100</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:6px">${closed.length} closed trades in ${periodLabel(rulesPeriod).toLowerCase()}</div>
+          <div style="margin-top:1rem;display:flex;gap:1rem;flex-wrap:wrap">
+            <div style="background:var(--surface2);border-radius:var(--radius);padding:.6rem .9rem;flex:1;min-width:100px">
+              <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Full compliance</div>
+              <div style="font-size:16px;font-weight:700;color:var(--green)">${allRulesFollowed.length} <span style="font-size:11px;font-weight:400;color:var(--muted)">trades</span></div>
+            </div>
+            <div style="background:var(--surface2);border-radius:var(--radius);padding:.6rem .9rem;flex:1;min-width:100px">
+              <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Rule broken</div>
+              <div style="font-size:16px;font-weight:700;color:var(--red)">${rulesBroken.length} <span style="font-size:11px;font-weight:400;color:var(--muted)">trades</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Rules vs. win rate</div>
+          <div style="margin-bottom:1.1rem">
+            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+              <span>All rules followed <span style="color:var(--muted)">(${allRulesFollowed.length})</span></span>
+              <strong style="color:var(--green)">${pct(wrAll)}</strong>
+            </div>
+            <div class="prog-track" style="height:9px"><div class="prog-fill" style="width:${pct(wrAll)};background:var(--green)"></div></div>
+          </div>
+          <div style="margin-bottom:1rem">
+            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+              <span>Rule broken <span style="color:var(--muted)">(${rulesBroken.length})</span></span>
+              <strong style="color:var(--red)">${pct(wrBroken)}</strong>
+            </div>
+            <div class="prog-track" style="height:9px"><div class="prog-fill" style="width:${pct(wrBroken)};background:var(--red)"></div></div>
+          </div>
+          ${allRulesFollowed.length && rulesBroken.length ? `
+            <div style="background:var(--surface2);border-radius:var(--radius);padding:.65rem .9rem;margin-top:.5rem">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Discipline edge</div>
+              <div style="font-size:18px;font-weight:700;color:${wrAll>=wrBroken?'var(--green)':'var(--red)'}">
+                ${wrAll>=wrBroken?'+':''}${((wrAll-wrBroken)*100).toFixed(1)}pp win rate
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    </div>
+
+    <!-- Discipline trend chart -->
+    <div class="card" style="margin-top:1rem">
+      <div class="card-title">Discipline trend — ${periodLabel(rulesPeriod)}</div>
+      <div style="position:relative;height:220px"><canvas id="chart-discipline"></canvas></div>
+      <div style="margin-top:1rem;padding-top:.9rem;border-top:1px solid var(--border);display:flex;gap:2rem;flex-wrap:wrap">
+        ${(() => {
+          const d2 = calcDisciplineStats(periodTrades);
+          const sc = d2.overallPct===null?'var(--muted)':d2.overallPct>=80?'var(--green)':d2.overallPct>=60?'var(--amber)':'var(--red)';
+          return `
+            <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.05em">Full compliance</div><div style="font-size:22px;font-weight:700;color:var(--green)">${d2.allFollowed.length} <span style="font-size:12px;font-weight:400;color:var(--muted)">trades</span></div></div>
+            <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.05em">Rule broken</div><div style="font-size:22px;font-weight:700;color:var(--red)">${d2.notFollowed.length} <span style="font-size:12px;font-weight:400;color:var(--muted)">trades</span></div></div>
+            <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.05em">Win rate edge</div><div style="font-size:22px;font-weight:700;color:${d2.wrAll!==null&&d2.wrNot!==null?(d2.wrAll-d2.wrNot>=0?'var(--green)':'var(--red)'):'var(--muted)'}">${d2.wrAll!==null&&d2.wrNot!==null?((d2.wrAll-d2.wrNot)>=0?'+':'')+((d2.wrAll-d2.wrNot)*100).toFixed(1)+'pp':'—'}</div></div>
+            <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.05em">Score</div><div style="font-size:22px;font-weight:700;color:${sc}">${d2.overallPct!==null?d2.overallPct+'%':'—'}</div></div>
+          `;
+        })()}
+      </div>
+    </div>
+
+  `;
+}
+function renderSettings() {
+  return `
+    <div class="topbar"><h2>Settings</h2></div>
+    <div class="grid-2">
+      <div>
+        <div class="card settings-section">
+          <h3>Account</h3>
+          <div class="settings-row"><label>Starting account size</label><input type="number" value="${data.settings.accountSize}" onchange="updateSetting('accountSize',+this.value)"></div>
+          <div class="settings-row"><label>Currency</label>
+            <select onchange="updateSetting('currency',this.value)">
+              ${['USD','EUR','GBP'].map(c=>`<option ${data.settings.currency===c?'selected':''}>${c}</option>`).join('')}
+            </select>
+          </div>
+          <div class="settings-row"><label>Default risk per trade (%)</label><input type="number" step="0.1" value="${data.settings.defaultRisk}" onchange="updateSetting('defaultRisk',+this.value)"></div>
+          <div class="settings-row"><label>Default R:R target</label><input type="number" step="0.1" value="${data.settings.riskReward}" onchange="updateSetting('riskReward',this.value)"></div>
+        </div>
+
+        <div class="card settings-section" style="margin-top:1rem">
+          <h3>Instruments</h3>
+          <div class="tag-wrap" style="margin-bottom:.75rem">
+            ${data.settings.instruments.map((inst,i)=>`
+              <span class="tag-pill" style="cursor:default">
+                ${inst}
+                <button onclick="removeInstrument(${i})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;padding:0 0 0 4px">×</button>
+              </span>
+            `).join('')}
+          </div>
+          <div style="display:flex;gap:.5rem">
+            <input type="text" id="new-inst" placeholder="Add symbol e.g. EUR/USD" style="flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-size:13px;padding:.45rem .7rem;outline:none">
+            <button class="btn btn-primary" onclick="addInstrument()">Add</button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card settings-section">
+          <h3>Trading rules</h3>
+          ${data.settings.rules.map((r,i)=>`
+            <div class="settings-row">
+              <label>${r}</label>
+              <button class="btn btn-sm btn-danger" onclick="removeRule(${i})">Remove</button>
+            </div>
+          `).join('')}
+          <div style="display:flex;gap:.5rem;margin-top:.75rem">
+            <input type="text" id="new-rule" placeholder="Add a rule…" style="flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-size:13px;padding:.45rem .7rem;outline:none">
+            <button class="btn btn-primary" onclick="addRule()">Add</button>
+          </div>
+        </div>
+
+        <div class="card settings-section" style="margin-top:1rem">
+          <h3>Trade tags / setups</h3>
+          <div class="tag-wrap" style="margin-bottom:.75rem">
+            ${data.settings.tags.map((tag,i)=>`
+              <span class="tag-pill" style="cursor:default">
+                ${tag}
+                <button onclick="removeTag(${i})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;padding:0 0 0 4px">×</button>
+              </span>
+            `).join('')}
+          </div>
+          <div style="display:flex;gap:.5rem">
+            <input type="text" id="new-tag" placeholder="Add tag e.g. Breakout" style="flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-size:13px;padding:.45rem .7rem;outline:none">
+            <button class="btn btn-primary" onclick="addTag()">Add</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:1rem">
+          <h3 style="font-size:14px;font-weight:600;margin-bottom:.75rem">Data</h3>
+          <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+            <button class="btn" onclick="exportData()">⬇ Export JSON</button>
+            <button class="btn" onclick="document.getElementById('import-file').click()">⬆ Import JSON</button>
+            <button class="btn btn-danger" onclick="resetData()">Reset all data</button>
+          </div>
+          <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)">
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ─── MODAL ─────────────────────────────────────────────────────────────────────
+// modalSession holds an array of trade drafts when adding/editing
+let modalSession = [];   // [{...tradeFields}, ...]
+let modalActiveIdx = 0;  // which tab is focused
+let modalMode = 'new';   // 'new' | 'edit'
+
+function blankTrade(date) {
+  return {
+    _sid: Math.random().toString(36).slice(2), // temp session id
+    id: null,
+    date: date || getLocalToday(),
+    symbol: data.settings.instruments[0] || '',
+    direction: 'Long', entry: '', exit: '', size: 1, pnl: '', rr: '',
+    tags: [], notes: '', outcome: 'Win',
+    rules: data.settings.rules.map(() => false), status: 'Closed',
+    screenshots: [], screenshotSizes: [],
+  };
+}
+
+// Open calendar day picker when multiple trades exist on a date
+function openDayPicker(dateStr, ids) {
+  const trades = ids.map(id => data.trades.find(t => t.id === id)).filter(Boolean);
+  document.getElementById('modal-box').innerHTML = `
+    <div class="modal-header">
+      <h2>Trades on ${dateStr}</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:.5rem">Select a trade to edit, or add a new trade for this day.</p>
+    <div class="day-picker-list">
+      ${trades.map(t => {
+        const p = pnlFromOutcome(t);
+        const outcome = (t.outcome || 'open').toLowerCase();
+        return `
+          <div class="day-picker-item" onclick="openModal(${t.id})">
+            <div>
+              <div class="dpi-symbol">${t.symbol} <span class="badge badge-${t.direction.toLowerCase()}" style="margin-left:4px">${t.direction}</span></div>
+              <div class="dpi-meta">${t.status} · ${t.tags?.join(', ') || 'No tags'}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:.75rem">
+              <span style="font-size:15px;font-weight:700;color:${p.color}">${p.display}</span>
+              <span class="badge badge-${outcome}">${t.outcome || 'Open'}</span>
+              <span style="color:var(--muted);font-size:18px">›</span>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:1.25rem">
+      <button class="btn" onclick="closeModal()">Close</button>
+      <button class="btn btn-primary" onclick="openModal(null,'${dateStr}')">＋ Add trade this day</button>
+    </div>
+  `;
+  document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+// Calendar cell click — single trade opens edit directly, multiple shows picker
+function calClick(dateStr, ids) {
+  const idArr = JSON.parse(ids);
+  if (idArr.length === 1) {
+    openModal(idArr[0]);
+  } else {
+    openDayPicker(dateStr, idArr);
+  }
+}
+
+function openModal(id, prefillDate) {
+  modalActiveIdx = 0;
+  if (id) {
+    // Edit mode — single trade, but can add more for the same day
+    modalMode = 'edit';
+    const t = data.trades.find(t => t.id === id);
+    modalSession = [{ ...t, _sid: Math.random().toString(36).slice(2), screenshots: [...(t.screenshots||[])], screenshotSizes: [...(t.screenshotSizes||[])] }];
+  } else {
+    // New mode — start with one blank trade
+    modalMode = 'new';
+    modalSession = [blankTrade(prefillDate)];
+  }
+  renderModal();
+  document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').style.display = 'none';
+  modalSession = [];
+}
+
+function addTradeTab() {
+  // Snapshot current tab first
+  snapshotCurrentTab();
+  const date = modalSession[modalActiveIdx]?.date || new Date().toISOString().slice(0,10);
+  modalSession.push(blankTrade(date));
+  modalActiveIdx = modalSession.length - 1;
+  renderModal();
+}
+
+function removeTradeTab(idx) {
+  if (modalSession.length <= 1) return;
+  modalSession.splice(idx, 1);
+  modalActiveIdx = Math.min(modalActiveIdx, modalSession.length - 1);
+  renderModal();
+}
+
+function switchTradeTab(idx) {
+  snapshotCurrentTab();
+  modalActiveIdx = idx;
+  renderModal();
+}
+
+function snapshotCurrentTab() {
+  const t = modalSession[modalActiveIdx];
+  if (!t) return;
+  const box = document.getElementById('modal-box');
+  if (!box) return;
+  t.date      = box.querySelector('#f-date')?.value      ?? t.date;
+  t.symbol    = box.querySelector('#f-symbol')?.value    ?? t.symbol;
+  t.status    = box.querySelector('#f-status')?.value    ?? t.status;
+  t.direction = box.querySelector('#f-dir')?.value       ?? t.direction;
+  t.entry     = parseFloat(box.querySelector('#f-entry')?.value)  || null;
+  t.exit      = parseFloat(box.querySelector('#f-exit')?.value)   || null;
+  t.size      = parseFloat(box.querySelector('#f-size')?.value)   || 1;
+  t.pnl       = parseFloat(box.querySelector('#f-pnl')?.value)    || 0;
+  t.rr        = parseFloat(box.querySelector('#f-rr')?.value)     || null;
+  t.outcome   = box.querySelector('#f-outcome')?.value   ?? t.outcome;
+  t.notes     = box.querySelector('#f-notes')?.value     ?? t.notes;
+  t.tags      = [...box.querySelectorAll('.tag-pill.active')].map(el => el.textContent.trim());
+  t.rules     = data.settings.rules.map((_, i) => box.querySelector(`#rule-${i}`)?.checked || false);
+  // screenshots already live on t.screenshots directly — no need to read from DOM
+}
+
+function renderModal() {
+  const t = modalSession[modalActiveIdx];
+
+  const tabHtml = modalSession.map((tr, i) => {
+    const oc = (tr.outcome || 'win').toLowerCase();
+    const dotClass = oc === 'loss' ? 'tab-loss' : oc === 'be' ? 'tab-be' : 'tab-win';
+    const label = tr.symbol || `Trade ${i+1}`;
+    return `<button class="trade-tab ${dotClass} ${i===modalActiveIdx?'active':''}" onclick="switchTradeTab(${i})">
+      <span class="tab-dot"></span>
+      ${label}
+      ${modalSession.length > 1 ? `<button class="tab-close" onclick="event.stopPropagation();removeTradeTab(${i})">×</button>` : ''}
+    </button>`;
+  }).join('');
+
+  const isEdit = modalMode === 'edit' && modalSession.length === 1 && t.id;
+  const titleText = isEdit ? `Edit trade — ${t.symbol}` : `New trade session`;
+
+  document.getElementById('modal-box').innerHTML = `
+    <div class="modal-header">
+      <h2>${titleText}</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+
+    <!-- Trade tabs -->
+    <div style="display:flex;align-items:flex-end;gap:4px;margin-bottom:0">
+      <div class="trade-tabs" id="trade-tabs">${tabHtml}</div>
+      <button class="add-trade-tab" onclick="addTradeTab()" title="Add another trade">＋ Add trade</button>
+    </div>
+
+    <!-- Trade form -->
+    <div id="trade-form-body" style="padding-top:1rem">
+      <div class="form-grid" style="margin-bottom:.75rem">
+        <div class="field"><label>Date</label><input type="date" id="f-date" value="${t.date}"></div>
+        <div class="field"><label>Symbol</label>
+          <select id="f-symbol">${data.settings.instruments.map(i=>`<option ${i===t.symbol?'selected':''}>${i}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>Status</label>
+          <select id="f-status"><option ${t.status==='Closed'?'selected':''}>Closed</option><option ${t.status==='Open'?'selected':''}>Open</option></select>
+        </div>
+        <div class="field"><label>Direction</label>
+          <select id="f-dir"><option ${t.direction==='Long'?'selected':''}>Long</option><option ${t.direction==='Short'?'selected':''}>Short</option></select>
+        </div>
+        <div class="field"><label>Entry price</label><input type="number" step="any" id="f-entry" value="${t.entry||''}"></div>
+        <div class="field"><label>Exit price</label><input type="number" step="any" id="f-exit" value="${t.exit||''}"></div>
+        <div class="field"><label>Position size</label><input type="number" step="any" id="f-size" value="${t.size||1}"></div>
+        <div class="field"><label>P&L (${data.settings.currency})</label><input type="number" step="any" id="f-pnl" value="${t.pnl??''}"></div>
+        <div class="field"><label>R:R achieved</label><input type="number" step="0.1" id="f-rr" value="${t.rr??''}"></div>
+        <div class="field"><label>Outcome</label>
+          <select id="f-outcome" onchange="liveUpdateTab(this.value)">
+            <option ${t.outcome==='Win'?'selected':''}>Win</option>
+            <option ${t.outcome==='Loss'?'selected':''}>Loss</option>
+            <option ${t.outcome==='BE'?'selected':''}>BE</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:.75rem">
+        <label>Tags / Setup</label>
+        <div class="tag-wrap" style="margin-top:6px">
+          ${data.settings.tags.map(tag=>`<span class="tag-pill ${(t.tags||[]).includes(tag)?'active':''}" onclick="this.classList.toggle('active')">${tag}</span>`).join('')}
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:.75rem">
+        <label>Notes</label>
+        <textarea id="f-notes" placeholder="What happened? What did you do well or poorly?">${t.notes||''}</textarea>
+      </div>
+      <div style="margin-bottom:1.25rem">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:.5rem">Rule checklist</div>
+        ${data.settings.rules.map((rule,i)=>`
+          <div class="rule-item">
+            <input type="checkbox" id="rule-${i}" ${(t.rules?.[i])?'checked':''}>
+            <label for="rule-${i}">${rule}</label>
+          </div>
+        `).join('')}
+      </div>
+
+      <!-- Screenshot upload -->
+      <div style="margin-bottom:1rem">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:.5rem">Screenshots</div>
+        <div id="screenshot-preview" style="display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:.5rem">
+          ${(t.screenshots||[]).map((src,i)=>`
+            ${(() => { const sz=(t.screenshotSizes||[])[i]||{w:200,h:130}; return `<div class="ss-wrap" style="position:relative;width:${sz.w}px;height:${sz.h}px;border-radius:var(--radius);overflow:visible;flex-shrink:0">
+              <div style="width:100%;height:100%;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border2);position:relative">
+                <img src="${src}" style="width:100%;height:100%;object-fit:cover;display:block;cursor:pointer" onclick="openScreenshot(${i})" title="Click to enlarge">
+                <button onclick="removeScreenshot(${i})" style="position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:var(--red);border:none;color:#fff;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2">×</button>
+              </div>
+              <div class="ss-resize" onmousedown="ssResizeStart(event,this.parentElement)" style="position:absolute;bottom:-4px;right:-4px;width:14px;height:14px;background:var(--accent);border-radius:3px;cursor:se-resize;z-index:3;display:flex;align-items:center;justify-content:center">
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1 7L7 1M4 7L7 4M7 7L7 7" stroke="white" stroke-width="1.2" stroke-linecap="round"/></svg>
+              </div>
+            </div>`; })()}
+          `).join('')}
+        </div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+          <label style="display:flex;align-items:center;gap:.6rem;padding:.6rem .9rem;border:1.5px dashed var(--border2);border-radius:var(--radius);cursor:pointer;font-size:13px;color:var(--muted);transition:all .15s"
+            onmouseenter="this.style.borderColor='var(--accent)';this.style.color='var(--text)'"
+            onmouseleave="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">
+            <span style="font-size:18px">📷</span> Add screenshot
+            <input type="file" accept="image/*" multiple style="display:none" onchange="addScreenshots(this)">
+          </label>
+          <div style="display:flex;align-items:center;gap:.5rem;padding:.6rem .9rem;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;color:var(--muted)">
+            <span style="font-size:15px">📋</span>
+            Press <kbd style="background:var(--surface3);border:1px solid var(--border2);border-radius:4px;padding:1px 6px;font-size:11px;font-family:monospace">Ctrl+V</kbd> to paste
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding-top:.75rem;border-top:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:.75rem">
+        <span style="font-size:12px;color:var(--muted)">${modalSession.length} trade${modalSession.length>1?'s':''} in session</span>
+        ${t.id ? `<button class="btn btn-sm btn-danger" onclick="deleteTradeFromModal(${t.id})" title="Delete this trade">🗑 Delete trade</button>` : ''}
+        ${!t.id && modalSession.length > 1 ? `<button class="btn btn-sm btn-danger" onclick="removeTradeTab(${modalActiveIdx})" title="Remove this trade from session">🗑 Remove</button>` : ''}
+      </div>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveAllTrades()">
+          ${isEdit ? 'Save trade' : `Save ${modalSession.length > 1 ? 'all '+modalSession.length+' trades' : 'trade'}`}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function liveUpdateTab(outcomeVal) {
+  modalSession[modalActiveIdx].outcome = outcomeVal;
+  const tabs = document.getElementById('trade-tabs');
+  if (!tabs) return;
+  const tab = tabs.children[modalActiveIdx];
+  if (!tab) return;
+  tab.classList.remove('tab-win','tab-loss','tab-be');
+  tab.classList.add(outcomeVal==='Loss'?'tab-loss':outcomeVal==='BE'?'tab-be':'tab-win');
+}
+
+function addScreenshots(input) {
+  const files = [...input.files];
+  if (!files.length) return;
+  const t = modalSession[modalActiveIdx];
+  if (!t.screenshots) t.screenshots = [];
+  if (!t.screenshotSizes) t.screenshotSizes = [];
+  let loaded = 0;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      t.screenshots.push(e.target.result);
+      t.screenshotSizes.push(defaultScreenshotSize());
+      if (++loaded === files.length) refreshScreenshotPreview(t);
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value = '';
+}
+
+function removeScreenshot(idx) {
+  const t = modalSession[modalActiveIdx];
+  if (!t.screenshots) return;
+  t.screenshots.splice(idx, 1);
+  if (t.screenshotSizes) t.screenshotSizes.splice(idx, 1);
+  refreshScreenshotPreview(t);
+}
+
+function ssResizeStart(e, wrap) {
+  e.preventDefault();
+  e.stopPropagation();
+  const startX = e.clientX;
+  const startY = e.clientY;
+  const startW = wrap.offsetWidth;
+  const startH = wrap.offsetHeight;
+  const MIN = 100;
+  // Constrain to modal inner width
+  const modal = document.getElementById('modal-box');
+  const MAX_W = modal ? modal.clientWidth - 40 : 660;
+  const MAX_H = 600;
+
+  // Find index of this wrap among siblings
+  const preview = document.getElementById('screenshot-preview');
+  const wraps = preview ? [...preview.querySelectorAll('.ss-wrap')] : [];
+  const idx = wraps.indexOf(wrap);
+
+  function onMove(ev) {
+    const w = Math.min(MAX_W, Math.max(MIN, startW + ev.clientX - startX));
+    const h = Math.min(MAX_H, Math.max(MIN, startH + ev.clientY - startY));
+    wrap.style.width  = w + 'px';
+    wrap.style.height = h + 'px';
+  }
+  function onUp() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    // Persist size to session trade
+    const t = modalSession[modalActiveIdx];
+    if (t && idx >= 0) {
+      if (!t.screenshotSizes) t.screenshotSizes = [];
+      t.screenshotSizes[idx] = { w: wrap.offsetWidth, h: wrap.offsetHeight };
+    }
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
+function pasteScreenshot() {
+  // Use clipboard API without permission prompt — just read directly
+  navigator.clipboard.read().then(items => {
+    for (const item of items) {
+      const imgType = item.types.find(t => t.startsWith('image/'));
+      if (imgType) {
+        item.getType(imgType).then(blob => {
+          const reader = new FileReader();
+          reader.onload = e => pushScreenshot(e.target.result);
+          reader.readAsDataURL(blob);
+        });
+        return;
+      }
+    }
+    toast('No image in clipboard — try Ctrl+V');
+  }).catch(() => {
+    toast('Press Ctrl+V to paste screenshot');
+  });
+}
+
+// Also support Ctrl+V paste directly when modal is open
+document.addEventListener('paste', e => {
+  if (!document.getElementById('modal-overlay')?.style.display || document.getElementById('modal-overlay').style.display === 'none') return;
+  const items = [...(e.clipboardData?.items || [])];
+  const imgItem = items.find(it => it.type.startsWith('image/'));
+  if (!imgItem) return;
+  e.preventDefault();
+  const blob = imgItem.getAsFile();
+  const reader = new FileReader();
+  reader.onload = ev => pushScreenshot(ev.target.result);
+  reader.readAsDataURL(blob);
+});
+
+function defaultScreenshotSize() {
+  const modal = document.getElementById('modal-box');
+  const w = modal ? modal.clientWidth - 40 : 620;
+  return { w, h: Math.round(w * 9/16) }; // 16:9 default height
+}
+
+function pushScreenshot(dataUrl) {
+  const t = modalSession[modalActiveIdx];
+  if (!t) return;
+  if (!t.screenshots) t.screenshots = [];
+  if (!t.screenshotSizes) t.screenshotSizes = [];
+  t.screenshots.push(dataUrl);
+  t.screenshotSizes.push(defaultScreenshotSize());
+  refreshScreenshotPreview(t);
+  toast('Screenshot added');
+}
+
+function refreshScreenshotPreview(t) {
+  const preview = document.getElementById('screenshot-preview');
+  if (!preview) return;
+  preview.innerHTML = (t.screenshots||[]).map((src,i) => {
+    const sz = (t.screenshotSizes||[])[i] || {w:200, h:130};
+    return `<div class="ss-wrap" style="position:relative;width:${sz.w}px;height:${sz.h}px;border-radius:var(--radius);overflow:visible;flex-shrink:0">
+      <div style="width:100%;height:100%;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border2);position:relative">
+        <img src="${src}" style="width:100%;height:100%;object-fit:cover;display:block;cursor:pointer" onclick="openScreenshot(${i})" title="Click to enlarge">
+        <button onclick="removeScreenshot(${i})" style="position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:var(--red);border:none;color:#fff;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2">×</button>
+      </div>
+      <div class="ss-resize" onmousedown="ssResizeStart(event,this.parentElement)" style="position:absolute;bottom:-4px;right:-4px;width:14px;height:14px;background:var(--accent);border-radius:3px;cursor:se-resize;z-index:3;display:flex;align-items:center;justify-content:center">
+        <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1 7L7 1M4 7L7 4M7 7L7 7" stroke="white" stroke-width="1.2" stroke-linecap="round"/></svg>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+
+function openScreenshot(idx) {
+  const t = modalSession[modalActiveIdx];
+  const src = t.screenshots?.[idx];
+  if (!src) return;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out';
+  overlay.onclick = () => overlay.remove();
+  const img = document.createElement('img');
+  img.src = src;
+  img.style.cssText = 'max-width:90vw;max-height:90vh;border-radius:8px;box-shadow:0 0 40px rgba(0,0,0,.5)';
+  overlay.appendChild(img);
+  document.body.appendChild(overlay);
+}
+
+function liveUpdateTab(outcomeVal) {
+  modalSession[modalActiveIdx].outcome = outcomeVal;
+  const tabs = document.getElementById('trade-tabs');
+  if (!tabs) return;
+  const tab = tabs.children[modalActiveIdx];
+  if (!tab) return;
+  tab.classList.remove('tab-win','tab-loss','tab-be');
+  tab.classList.add(outcomeVal==='Loss'?'tab-loss':outcomeVal==='BE'?'tab-be':'tab-win');
+}
+
+function saveAllTrades() {
+  snapshotCurrentTab();
+  let saved = 0;
+  modalSession.forEach(t => {
+    const trade = {
+      id: t.id || data.nextId++,
+      date: t.date,
+      symbol: t.symbol,
+      direction: t.direction,
+      status: t.status,
+      entry: t.entry ?? null,
+      exit: t.exit ?? null,
+      size: t.size || 1,
+      pnl: t.pnl || 0,
+      rr: t.rr || null,
+      outcome: t.outcome,
+      notes: t.notes || '',
+      tags: t.tags || [],
+      rules: t.rules || data.settings.rules.map(()=>false),
+      screenshots: t.screenshots || [],
+      screenshotSizes: t.screenshotSizes || [],
+    };
+    if (t.id) {
+      const i = data.trades.findIndex(x => x.id === t.id);
+      if (i >= 0) data.trades[i] = trade;
+    } else {
+      data.trades.push(trade);
+    }
+    saved++;
+  });
+  save();
+  closeModal();
+  render();
+  toast(saved > 1 ? `${saved} trades saved` : modalMode === 'edit' ? 'Trade updated' : 'Trade saved');
+}
+
+function deleteTradeFromModal(id) {
+  data.trades = data.trades.filter(t => t.id !== id);
+  // Remove from session too
+  modalSession = modalSession.filter(t => t.id !== id);
+  save();
+  if (modalSession.length === 0) {
+    closeModal();
+    render();
+    toast('Trade deleted');
+  } else {
+    modalActiveIdx = Math.min(modalActiveIdx, modalSession.length - 1);
+    render();
+    renderModal();
+    toast('Trade deleted');
+  }
+}
+
+function deleteTrade(id) {
+  data.trades = data.trades.filter(t=>t.id!==id);
+  save(); render(); toast('Trade deleted');
+}
+
+// ─── SETTINGS ACTIONS ─────────────────────────────────────────────────────────
+function updateSetting(key, val) { data.settings[key]=val; save(); render(); }
+function addRule() {
+  const inp = document.getElementById('new-rule');
+  if (!inp.value.trim()) return;
+  data.settings.rules.push(inp.value.trim()); save(); render();
+}
+function removeRule(i) { data.settings.rules.splice(i,1); save(); render(); }
+function addTag() {
+  const inp = document.getElementById('new-tag');
+  if (!inp.value.trim()) return;
+  data.settings.tags.push(inp.value.trim()); save(); render();
+}
+function removeTag(i) { data.settings.tags.splice(i,1); save(); render(); }
+function addInstrument() {
+  const inp = document.getElementById('new-inst');
+  if (!inp.value.trim()) return;
+  data.settings.instruments.push(inp.value.trim().toUpperCase()); save(); render();
+}
+function removeInstrument(i) { data.settings.instruments.splice(i,1); save(); render(); }
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='trade-journal-export.json'; a.click();
+  URL.revokeObjectURL(url); toast('Data exported');
+}
+function importData(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (!imported.trades || !imported.settings) throw new Error('Invalid file');
+      if (!confirm(`Import ${imported.trades.length} trades? This will replace current data.`)) return;
+      data = imported; save(); render(); toast('Data imported');
+    } catch { toast('Import failed — invalid file'); }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+function setFilter(tag) { filterTag = tag; render(); }
+function setJournalView(v) {
+  journalView = v;
+  localStorage.setItem('tj_view', v);
+  render();
+}
+
+function toast(msg) {
+  const el = document.createElement('div'); el.className='toast'; el.textContent=msg;
+  document.body.appendChild(el); setTimeout(()=>el.remove(), 2500);
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+render();
+renderAcctBtn();
+</script>
+</body>
+</html>
