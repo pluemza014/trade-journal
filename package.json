@@ -1,0 +1,12 @@
+{
+  "name": "trade-journal",
+  "version": "1.0.0",
+  "description": "Personal trading journal",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
