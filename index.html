@@ -1949,10 +1949,34 @@ function renderModal() {
   const isEdit = modalMode === 'edit' && modalSession.length === 1 && t.id;
   const titleText = isEdit ? `Edit trade — ${t.symbol}` : `New trade session`;
 
+  // Find same-day trades for navigation when editing
+  let sameDayNav = '';
+  if (isEdit && t.date) {
+    const sameDayTrades = data.trades
+      .filter(x => x.date === t.date && x.status === 'Closed')
+      .sort((a,b) => a.id - b.id);
+    if (sameDayTrades.length > 1) {
+      const idx = sameDayTrades.findIndex(x => x.id === t.id);
+      const prev = sameDayTrades[idx - 1];
+      const next = sameDayTrades[idx + 1];
+      sameDayNav = `
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)">
+          <button class="btn btn-sm" onclick="saveAndNavTrade(${prev?.id ?? 'null'})"
+            style="${!prev ? 'opacity:.3;pointer-events:none' : ''}" title="Previous trade this day">‹</button>
+          <span style="min-width:40px;text-align:center">${idx+1} / ${sameDayTrades.length}</span>
+          <button class="btn btn-sm" onclick="saveAndNavTrade(${next?.id ?? 'null'})"
+            style="${!next ? 'opacity:.3;pointer-events:none' : ''}" title="Next trade this day">›</button>
+        </div>`;
+    }
+  }
+
   document.getElementById('modal-box').innerHTML = `
     <div class="modal-header">
       <h2>${titleText}</h2>
-      <button class="modal-close" onclick="closeModal()">×</button>
+      <div style="display:flex;align-items:center;gap:.75rem">
+        ${sameDayNav}
+        <button class="modal-close" onclick="closeModal()">×</button>
+      </div>
     </div>
 
     <!-- Trade tabs -->
@@ -2053,6 +2077,27 @@ function renderModal() {
       </div>
     </div>
   `;
+}
+
+function saveAndNavTrade(id) {
+  if (!id) return;
+  // Save silently without triggering a full page render
+  snapshotCurrentTab();
+  modalSession.forEach(t => {
+    const trade = {
+      id: t.id || data.nextId++,
+      date: t.date, symbol: t.symbol, direction: t.direction,
+      status: t.status, entry: t.entry ?? null, exit: t.exit ?? null,
+      size: t.size || 1, pnl: t.pnl || 0, rr: t.rr || null,
+      outcome: t.outcome, notes: t.notes || '',
+      tags: t.tags || [], rules: t.rules || data.settings.rules.map(()=>false),
+      screenshots: t.screenshots || [], screenshotSizes: t.screenshotSizes || [],
+    };
+    if (t.id) { const i = data.trades.findIndex(x => x.id === t.id); if (i >= 0) data.trades[i] = trade; }
+    else { data.trades.push(trade); }
+  });
+  save(); // async, fire and forget
+  openModal(id); // open next trade immediately, no render in between
 }
 
 function liveUpdateTab(outcomeVal) {
