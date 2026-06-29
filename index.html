@@ -825,7 +825,7 @@ function updateDashKPIs() {
     </div>
     <div class="kpi">
       <div class="kpi-label">Net P&L</div>
-      <div class="kpi-value ${s2.totalPnl>=0?'up':'down'}">${s2.totalPnl>=0?'+':''}${cur(Math.abs(s2.totalPnl))}</div>
+      <div class="kpi-value ${s2.totalPnl>=0?'up':'down'}">${s2.totalPnl>0?'+':''}${cur(s2.totalPnl)}</div>
       <div class="kpi-sub">${s2.wins.length}W / ${s2.losses.length}L</div>
     </div>
     <div class="kpi">
@@ -1151,7 +1151,7 @@ function renderDashboard(s) {
       </div>
       <div class="kpi">
         <div class="kpi-label">Net P&L</div>
-        <div class="kpi-value ${ps.totalPnl>=0?'up':'down'}">${ps.totalPnl>=0?'+':''}${cur(Math.abs(ps.totalPnl))}${ps.totalPnl<0?'':''}</div>
+        <div class="kpi-value ${ps.totalPnl>=0?'up':'down'}">${ps.totalPnl>0?'+':''}${cur(ps.totalPnl)}</div>
         <div class="kpi-sub">${ps.wins.length}W / ${ps.losses.length}L</div>
       </div>
       <div class="kpi">
