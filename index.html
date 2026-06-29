@@ -929,13 +929,14 @@ function buildCalendarGrid(trades, hideMonthly, periodFrom, periodTo) {
   // dayMap
   const dayMap = {};
   trades.filter(t => t.status === 'Closed').forEach(t => {
-    if (!dayMap[t.date]) dayMap[t.date] = { pnl:0, count:0, ruleSlots:0, ruleFollowed:0, ids:[], wins:0, losses:0 };
+    if (!dayMap[t.date]) dayMap[t.date] = { pnl:0, count:0, ruleSlots:0, ruleFollowed:0, ids:[], wins:0, losses:0, mistakes:0 };
     const signed = t.outcome==='Loss' ? -Math.abs(t.pnl||0) : Math.abs(t.pnl||0);
     dayMap[t.date].pnl += signed;
     dayMap[t.date].count++;
     dayMap[t.date].ids.push(t.id);
     if (t.outcome==='Win')  dayMap[t.date].wins++;
     if (t.outcome==='Loss') dayMap[t.date].losses++;
+    dayMap[t.date].mistakes += (t.mistakes||[]).length;
     if (t.rules?.length) {
       dayMap[t.date].ruleSlots    += t.rules.length;
       dayMap[t.date].ruleFollowed += t.rules.filter(Boolean).length;
@@ -975,6 +976,9 @@ function buildCalendarGrid(trades, hideMonthly, periodFrom, periodTo) {
         dh=`<div class="cal-disc" style="color:${dc}">${dp}% disc.</div>`;
       }
       th=`<div class="cal-trades">${day.count} trade${day.count>1?'s':''}</div>`;
+      if (day.mistakes > 0) {
+        th += `<div style="font-size:10px;color:var(--red);margin-top:1px">⚠ ${day.mistakes} mistake${day.mistakes>1?'s':''}</div>`;
+      }
       const ij=JSON.stringify(day.ids).replace(/"/g,'&quot;');
       ca=`onclick="calClick('${dateStr}','${ij}')"`;cs='cursor:pointer;';
     } else {
@@ -1010,6 +1014,7 @@ function buildCalendarGrid(trades, hideMonthly, periodFrom, periodTo) {
     const wl=allAct.reduce((s,d)=>s+dayMap[d].losses,0);
     const ws=allAct.reduce((s,d)=>s+dayMap[d].ruleSlots,0);
     const wf=allAct.reduce((s,d)=>s+dayMap[d].ruleFollowed,0);
+    const wm=allAct.reduce((s,d)=>s+(dayMap[d].mistakes||0),0);
     const disc=ws?Math.round(wf/ws*100):null;
     const pc=wp>0?'var(--green)':wp<0?'var(--red)':'var(--muted)';
     const dc=disc===null?'var(--muted)':disc>=80?'var(--green)':disc>=60?'var(--amber)':'var(--red)';
@@ -1019,6 +1024,7 @@ function buildCalendarGrid(trades, hideMonthly, periodFrom, periodTo) {
       <div class="cws-pnl" style="color:${pc}">${wp>0?'+':''}${cur(wp)}</div>
       <div class="cws-meta">${wt} trade${wt>1?'s':''}</div>
       ${disc!==null?`<div class="cws-disc" style="color:${dc}">${disc}% discipline</div>`:''}
+      ${wm>0?`<div style="font-size:10px;color:var(--red);margin-top:2px;font-weight:600">⚠ ${wm} mistake${wm>1?'s':''}</div>`:''}
     </div>`;
   }
 
@@ -1184,10 +1190,23 @@ function renderDashboard(s) {
   `;
 }
 
+function calcMistakeStats(trades) {
+  const closed = trades.filter(t => t.status === 'Closed');
+  const withMistakes    = closed.filter(t => t.mistakes?.length > 0);
+  const withoutMistakes = closed.filter(t => !t.mistakes?.length);
+  // Frequency per mistake type
+  const freq = {};
+  closed.forEach(t => (t.mistakes||[]).forEach(m => { freq[m] = (freq[m]||0) + 1; }));
+  const sorted = Object.entries(freq).sort((a,b) => b[1]-a[1]);
+  const totalMistakeCount = Object.values(freq).reduce((s,v)=>s+v,0);
+  return { withMistakes, withoutMistakes, sorted, totalMistakeCount, total: closed.length };
+}
+
 function renderDashLowerSections(d, trades, scoreColor) {
   const activePeriodLabel = calNavMode
     ? (() => { const M=['January','February','March','April','May','June','July','August','September','October','November','December']; return M[calViewMonth]+' '+calViewYear; })()
     : periodLabel(dashPeriod);
+  const ms = calcMistakeStats(trades);
   return `
     <div class="grid-2">
       <div class="card">
@@ -1234,17 +1253,85 @@ function renderDashLowerSections(d, trades, scoreColor) {
       </div>
     </div>
 
+    <!-- Mistake frequency -->
+    <div class="card" style="margin-bottom:1rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+          <div class="card-title" style="margin-bottom:0">Trading mistakes — ${activePeriodLabel}</div>
+          <div style="display:flex;gap:1.5rem;font-size:13px">
+            <span><span style="color:var(--red);font-weight:700">${ms.withMistakes.length}</span> <span style="color:var(--muted)">with mistakes</span></span>
+            <span><span style="color:var(--green);font-weight:700">${ms.withoutMistakes.length}</span> <span style="color:var(--muted)">clean</span></span>
+            <span><span style="color:var(--text);font-weight:700">${ms.totalMistakeCount}</span> <span style="color:var(--muted)">total</span></span>
+          </div>
+        </div>
+        ${renderPeriodFilter(dashPeriod, 'setDashPeriod')}
+      </div>
+      ${ms.sorted.length === 0
+        ? `<p style="color:var(--green);font-size:13px">✓ No mistakes logged this period.</p>`
+        : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.75rem">
+            ${ms.sorted.map(([mistake, count]) => {
+              const pctVal = ms.total ? Math.round(count / ms.total * 100) : 0;
+              const affectedTrades = [...trades]
+                .filter(t => (t.mistakes||[]).includes(mistake) && t.status==='Closed')
+                .sort((a,b) => b.date.localeCompare(a.date));
+              const cardId = 'mk-' + mistake.replace(/[^a-z0-9]/gi,'_');
+              return `<div style="background:var(--surface2);border-radius:var(--radius);border-left:3px solid var(--red);overflow:hidden">
+                <div style="padding:.75rem 1rem;cursor:pointer" onclick="
+                  const body=document.getElementById('${cardId}');
+                  const arrow=document.getElementById('${cardId}-arrow');
+                  if(body.style.display==='none'){body.style.display='block';arrow.textContent='▲';}
+                  else{body.style.display='none';arrow.textContent='▼';}
+                ">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <span style="font-size:13px;font-weight:500">${mistake}</span>
+                    <div style="display:flex;align-items:center;gap:.5rem">
+                      <span style="font-size:13px;font-weight:700;color:var(--red)">${count}×</span>
+                      <span id="${cardId}-arrow" style="font-size:10px;color:var(--muted)">▼</span>
+                    </div>
+                  </div>
+                  <div class="prog-track"><div class="prog-fill" style="width:${pctVal}%;background:var(--red)"></div></div>
+                  <div style="font-size:11px;color:var(--muted);margin-top:4px">${pctVal}% of trades this period</div>
+                </div>
+                <div id="${cardId}" style="display:none;border-top:1px solid var(--border)">
+                  <table style="width:100%;border-collapse:collapse;font-size:12px">
+                    <thead><tr>
+                      <th style="text-align:left;padding:.4rem .75rem;color:var(--muted);font-weight:400;font-size:11px;border-bottom:1px solid var(--border)">Date</th>
+                      <th style="text-align:left;padding:.4rem .75rem;color:var(--muted);font-weight:400;font-size:11px;border-bottom:1px solid var(--border)">Symbol</th>
+                      <th style="text-align:left;padding:.4rem .75rem;color:var(--muted);font-weight:400;font-size:11px;border-bottom:1px solid var(--border)">P&L</th>
+                      <th style="text-align:left;padding:.4rem .75rem;color:var(--muted);font-weight:400;font-size:11px;border-bottom:1px solid var(--border)">Result</th>
+                    </tr></thead>
+                    <tbody>
+                      ${affectedTrades.map(t => {
+                        const p = pnlFromOutcome(t);
+                        return `<tr onclick="openModal(${t.id})" style="cursor:pointer">
+                          <td style="padding:.4rem .75rem;color:var(--muted);border-bottom:1px solid var(--border)">${t.date}</td>
+                          <td style="padding:.4rem .75rem;font-weight:600;border-bottom:1px solid var(--border)">${t.symbol}</td>
+                          <td style="padding:.4rem .75rem;color:${p.color};font-weight:600;border-bottom:1px solid var(--border)">${p.display}</td>
+                          <td style="padding:.4rem .75rem;border-bottom:1px solid var(--border)"><span class="badge badge-${(t.outcome||'open').toLowerCase()}">${t.outcome||'Open'}</span></td>
+                        </tr>`;
+                      }).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>`}
+    </div>
+
     <div class="card">
       <div class="card-title">Recent trades — ${activePeriodLabel}</div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Date</th><th>Symbol</th><th>Dir</th><th>P&L</th><th>Result</th><th>Discipline</th></tr></thead>
+          <thead><tr><th>Date</th><th>Symbol</th><th>Dir</th><th>P&L</th><th>Result</th><th>Discipline</th><th>Mistakes</th></tr></thead>
           <tbody>
             ${[...trades].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10).map(t => {
               const rules = t.rules || [];
               const dp = rules.length ? Math.round(rules.filter(Boolean).length / rules.length * 100) : null;
               const dc = dp === null ? 'var(--muted)' : dp >= 80 ? 'var(--green)' : dp >= 60 ? 'var(--amber)' : 'var(--red)';
               const p = pnlFromOutcome(t);
+              const mCount = (t.mistakes||[]).length;
+              const mColor = mCount === 0 ? 'var(--green)' : mCount <= 1 ? 'var(--amber)' : 'var(--red)';
+              const mLabel = mCount === 0 ? 'Clean' : `${mCount} mistake${mCount>1?'s':''}`;
               return `<tr>
                 <td style="color:var(--muted)">${t.date}</td>
                 <td style="font-weight:600">${t.symbol}</td>
@@ -1258,6 +1345,10 @@ function renderDashLowerSections(d, trades, scoreColor) {
                     </div>
                     <span style="font-size:12px;font-weight:600;color:${dc}">${dp}%</span>
                   </div>` : '<span style="color:var(--muted)">—</span>'}
+                </td>
+                <td>
+                  <span style="font-size:12px;font-weight:600;color:${mColor}">${mLabel}</span>
+                  ${mCount > 0 ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">${(t.mistakes||[]).join(', ')}</div>` : ''}
                 </td>
               </tr>`;
             }).join('')}
