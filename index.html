@@ -825,7 +825,7 @@ function updateDashKPIs() {
     </div>
     <div class="kpi">
       <div class="kpi-label">Net P&L</div>
-      <div class="kpi-value ${s2.totalPnl>=0?'up':'down'}">${cur(s2.totalPnl)}</div>
+      <div class="kpi-value ${s2.totalPnl>=0?'up':'down'}">${s2.totalPnl>=0?'+':''}${cur(Math.abs(s2.totalPnl))}</div>
       <div class="kpi-sub">${s2.wins.length}W / ${s2.losses.length}L</div>
     </div>
     <div class="kpi">
@@ -835,8 +835,12 @@ function updateDashKPIs() {
     </div>
     <div class="kpi" style="border-left:3px solid var(--red)">
       <div class="kpi-label">Most broken rule</div>
-      <div class="kpi-value down" style="font-size:14px;line-height:1.3">${d2.worstRule?d2.worstRule.pct+'%':'—'}</div>
-      <div class="kpi-sub">${d2.worstRule?d2.worstRule.rule:'No data yet'}</div>
+      ${(() => {
+        const worst = d2.worstRule && d2.worstRule.pct < 100 ? d2.worstRule : null;
+        return worst
+          ? `<div class="kpi-value down" style="font-size:14px;line-height:1.3">${worst.pct}% followed</div><div class="kpi-sub">${worst.rule}</div>`
+          : `<div class="kpi-value" style="font-size:14px;color:var(--green)">All rules followed</div><div class="kpi-sub">100% discipline</div>`;
+      })()}
     </div>`;
 
   if (lowerWrap) {
@@ -1147,7 +1151,7 @@ function renderDashboard(s) {
       </div>
       <div class="kpi">
         <div class="kpi-label">Net P&L</div>
-        <div class="kpi-value ${ps.totalPnl>=0?'up':'down'}">${cur(ps.totalPnl)}</div>
+        <div class="kpi-value ${ps.totalPnl>=0?'up':'down'}">${ps.totalPnl>=0?'+':''}${cur(Math.abs(ps.totalPnl))}${ps.totalPnl<0?'':''}</div>
         <div class="kpi-sub">${ps.wins.length}W / ${ps.losses.length}L</div>
       </div>
       <div class="kpi">
@@ -1157,8 +1161,14 @@ function renderDashboard(s) {
       </div>
       <div class="kpi" style="border-left: 3px solid var(--red)">
         <div class="kpi-label">Most broken rule</div>
-        <div class="kpi-value down" style="font-size:14px;line-height:1.3">${d.worstRule ? d.worstRule.pct+'%' : '—'}</div>
-        <div class="kpi-sub">${d.worstRule ? d.worstRule.rule : 'No data yet'}</div>
+        ${(() => {
+          const worst = d.worstRule && d.worstRule.pct < 100 ? d.worstRule : null;
+          return worst
+            ? `<div class="kpi-value down" style="font-size:14px;line-height:1.3">${worst.pct}% followed</div>
+               <div class="kpi-sub">${worst.rule}</div>`
+            : `<div class="kpi-value" style="font-size:14px;color:var(--green)">All rules followed</div>
+               <div class="kpi-sub">100% discipline</div>`;
+        })()}
       </div>
     </div>
 
