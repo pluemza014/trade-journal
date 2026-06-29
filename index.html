@@ -588,10 +588,10 @@ function calcStats() {
   const wins = closed.filter(t => t.outcome === 'Win');
   const losses = closed.filter(t => t.outcome === 'Loss');
   const bes = closed.filter(t => t.outcome === 'BE');
-  const totalPnl = closed.reduce((s, t) => s + (t.pnl || 0), 0);
+  const totalPnl = closed.reduce((s, t) => s + (t.outcome === 'Loss' ? -Math.abs(t.pnl||0) : Math.abs(t.pnl||0)), 0);
   const winRate = closed.length ? wins.length / closed.length : 0;
-  const avgWin = wins.length ? wins.reduce((s,t)=>s+t.pnl,0)/wins.length : 0;
-  const avgLoss = losses.length ? Math.abs(losses.reduce((s,t)=>s+t.pnl,0)/losses.length) : 0;
+  const avgWin = wins.length ? wins.reduce((s,t)=>s+Math.abs(t.pnl||0),0)/wins.length : 0;
+  const avgLoss = losses.length ? losses.reduce((s,t)=>s+Math.abs(t.pnl||0),0)/losses.length : 0;
   const profitFactor = (avgLoss && losses.length) ? (avgWin * wins.length) / (avgLoss * losses.length) : 0;
   const expectancy = closed.length ? totalPnl / closed.length : 0;
   const maxDD = calcMaxDD(closed);
@@ -601,7 +601,7 @@ function calcStats() {
 function calcMaxDD(trades) {
   let peak = data.settings.accountSize, eq = data.settings.accountSize, maxDD = 0;
   [...trades].sort((a,b) => a.date.localeCompare(b.date)).forEach(t => {
-    eq += (t.pnl || 0);
+    eq += (t.outcome === 'Loss' ? -Math.abs(t.pnl||0) : Math.abs(t.pnl||0));
     if (eq > peak) peak = eq;
     const dd = (peak - eq) / peak;
     if (dd > maxDD) maxDD = dd;
@@ -613,7 +613,11 @@ function equityCurve() {
   const closed = [...data.trades].filter(t => t.status === 'Closed').sort((a,b)=>a.date.localeCompare(b.date));
   let eq = data.settings.accountSize;
   const pts = [{ x: 'Start', y: eq }];
-  closed.forEach(t => { eq += (t.pnl || 0); pts.push({ x: t.date, y: +eq.toFixed(2) }); });
+  closed.forEach(t => {
+    const signed = t.outcome === 'Loss' ? -Math.abs(t.pnl || 0) : Math.abs(t.pnl || 0);
+    eq += signed;
+    pts.push({ x: t.date, y: +eq.toFixed(2) });
+  });
   return pts;
 }
 
@@ -747,10 +751,19 @@ function calcDisciplineStats(trades) {
   const wrAll = allFollowed.length ? allFollowed.filter(t=>t.outcome==='Win').length / allFollowed.length : null;
   const wrNot = notFollowed.length ? notFollowed.filter(t=>t.outcome==='Win').length / notFollowed.length : null;
 
-  const last10 = [...closed].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10).reverse();
-  const trendPts = last10.map(t => ({
-    date: t.date,
-    score: Math.round(t.rules.filter(Boolean).length / t.rules.length * 100),
+  // Group by date — one point per day, combining all trades that day
+  const dayMap2 = {};
+  closed.forEach(t => {
+    if (!t.rules?.length) return;
+    if (!dayMap2[t.date]) dayMap2[t.date] = { slots: 0, followed: 0 };
+    dayMap2[t.date].slots    += t.rules.length;
+    dayMap2[t.date].followed += t.rules.filter(Boolean).length;
+  });
+  // Last 10 trading days
+  const last10days = Object.keys(dayMap2).sort().slice(-10);
+  const trendPts = last10days.map(date => ({
+    date,
+    score: Math.round(dayMap2[date].followed / dayMap2[date].slots * 100),
   }));
 
   const worstRule = [...ruleBreakdown].filter(r=>r.total>0).sort((a,b)=>a.pct-b.pct)[0] || null;
@@ -840,8 +853,7 @@ function calcStatsFor(trades) {
   const losses = closed.filter(t=>t.outcome==='Loss');
   const totalPnl = closed.reduce((s,t)=>s+(t.outcome==='Loss'?-Math.abs(t.pnl||0):Math.abs(t.pnl||0)),0);
   return { closed, wins, losses, totalPnl };
-}
-function renderRuleLogBody(monthOverride) {
+}function renderRuleLogBody(monthOverride) {
   // If monthOverride provided (YYYY-MM), show that month; else use logPeriod filter
   let logTrades;
   if (monthOverride) {
