@@ -825,7 +825,7 @@ function updateDashKPIs() {
     </div>
     <div class="kpi">
       <div class="kpi-label">Net P&L</div>
-      <div class="kpi-value ${s2.totalPnl>=0?'up':'down'}">${s2.totalPnl>=0?'+':''}${cur(Math.abs(s2.totalPnl))}</div>
+      <div class="kpi-value ${s2.totalPnl>=0?'up':'down'}">${s2.totalPnl>0?'+':''}${cur(s2.totalPnl)}</div>
       <div class="kpi-sub">${s2.wins.length}W / ${s2.losses.length}L</div>
     </div>
     <div class="kpi">
@@ -1126,7 +1126,7 @@ function renderDashboard(s) {
     const closed = periodTrades.filter(t=>t.status==='Closed');
     const wins = closed.filter(t=>t.outcome==='Win');
     const losses = closed.filter(t=>t.outcome==='Loss');
-    const totalPnl = closed.reduce((sum,t)=>sum+(t.pnl||0),0);
+    const totalPnl = closed.reduce((sum,t) => sum + (t.outcome==='Loss' ? -Math.abs(t.pnl||0) : Math.abs(t.pnl||0)), 0);
     const winRate = closed.length ? wins.length/closed.length : 0;
     return { closed, wins, losses, totalPnl, winRate };
   })();
@@ -1151,7 +1151,7 @@ function renderDashboard(s) {
       </div>
       <div class="kpi">
         <div class="kpi-label">Net P&L</div>
-        <div class="kpi-value ${ps.totalPnl>=0?'up':'down'}">${ps.totalPnl>=0?'+':''}${cur(Math.abs(ps.totalPnl))}${ps.totalPnl<0?'':''}</div>
+        <div class="kpi-value ${ps.totalPnl>=0?'up':'down'}">${ps.totalPnl>0?'+':''}${cur(ps.totalPnl)}</div>
         <div class="kpi-sub">${ps.wins.length}W / ${ps.losses.length}L</div>
       </div>
       <div class="kpi">
