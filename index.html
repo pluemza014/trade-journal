@@ -356,6 +356,7 @@ const DEFAULT_SETTINGS = {
     'Risk within allowed limit',
   ],
   tags: ['Breakout','Reversal','Trend','Scalp','Swing','News','Gap','Range','Pullback'],
+  mistakes: ['Moved stop loss','Overtraded','Revenge trade','FOMO entry','No setup','Sized too big'],
 };
 
 function makeDefaultAccountData() {
@@ -1789,6 +1790,22 @@ function renderSettings() {
           </div>
         </div>
 
+        <div class="card settings-section" style="margin-top:1rem">
+          <h3>Trading mistakes</h3>
+          <div class="tag-wrap" style="margin-bottom:.75rem">
+            ${(data.settings.mistakes||[]).map((m,i)=>`
+              <span class="tag-pill" style="cursor:default;border-color:var(--red);color:var(--red)">
+                ${m}
+                <button onclick="removeMistake(${i})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;line-height:1;padding:0 0 0 4px">×</button>
+              </span>
+            `).join('')}
+          </div>
+          <div style="display:flex;gap:.5rem">
+            <input type="text" id="new-mistake" placeholder="e.g. Moved stop loss, Overtraded…" style="flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-size:13px;padding:.45rem .7rem;outline:none">
+            <button class="btn btn-primary" onclick="addMistake()">Add</button>
+          </div>
+        </div>
+
         <div class="card" style="margin-top:1rem">
           <h3 style="font-size:14px;font-weight:600;margin-bottom:.75rem">Data</h3>
           <div style="display:flex;gap:.75rem;flex-wrap:wrap">
@@ -1818,7 +1835,7 @@ function blankTrade(date) {
     direction: 'Long', entry: '', exit: '', size: 1, pnl: '', rr: '',
     tags: [], notes: '', outcome: 'Win',
     rules: data.settings.rules.map(() => false), status: 'Closed',
-    screenshots: [], screenshotSizes: [],
+    screenshots: [], screenshotSizes: [], mistakes: [],
   };
 }
 
@@ -1927,7 +1944,8 @@ function snapshotCurrentTab() {
   t.rr        = parseFloat(box.querySelector('#f-rr')?.value)     || null;
   t.outcome   = box.querySelector('#f-outcome')?.value   ?? t.outcome;
   t.notes     = box.querySelector('#f-notes')?.value     ?? t.notes;
-  t.tags      = [...box.querySelectorAll('.tag-pill.active')].map(el => el.textContent.trim());
+  t.tags      = [...box.querySelectorAll('.tag-pill.active:not(.mistake-pill)')].map(el => el.textContent.trim());
+  t.mistakes  = [...box.querySelectorAll('.mistake-pill.active')].map(el => el.textContent.trim());
   t.rules     = data.settings.rules.map((_, i) => box.querySelector(`#rule-${i}`)?.checked || false);
   // screenshots already live on t.screenshots directly — no need to read from DOM
 }
@@ -2017,6 +2035,15 @@ function renderModal() {
           ${data.settings.tags.map(tag=>`<span class="tag-pill ${(t.tags||[]).includes(tag)?'active':''}" onclick="this.classList.toggle('active')">${tag}</span>`).join('')}
         </div>
       </div>
+      ${(data.settings.mistakes||[]).length ? `
+      <div class="field" style="margin-bottom:.75rem">
+        <label style="color:var(--red)">Trading mistakes</label>
+        <div class="tag-wrap" style="margin-top:6px">
+          ${data.settings.mistakes.map(m=>`<span class="tag-pill mistake-pill ${(t.mistakes||[]).includes(m)?'active':''}"
+            style="${(t.mistakes||[]).includes(m)?'background:rgba(232,64,64,0.15);border-color:var(--red);color:var(--red)':'border-color:rgba(232,64,64,0.4);color:var(--muted)'}"
+            onclick="toggleMistakePill(this)">${m}</span>`).join('')}
+        </div>
+      </div>` : ''}
       <div class="field" style="margin-bottom:.75rem">
         <label>Notes</label>
         <textarea id="f-notes" placeholder="What happened? What did you do well or poorly?">${t.notes||''}</textarea>
@@ -2288,6 +2315,7 @@ function saveAllTrades() {
       rules: t.rules || data.settings.rules.map(()=>false),
       screenshots: t.screenshots || [],
       screenshotSizes: t.screenshotSizes || [],
+      mistakes: t.mistakes || [],
     };
     if (t.id) {
       const i = data.trades.findIndex(x => x.id === t.id);
@@ -2333,6 +2361,30 @@ function addRule() {
   data.settings.rules.push(inp.value.trim()); save(); render();
 }
 function removeRule(i) { data.settings.rules.splice(i,1); save(); render(); }
+function addMistake() {
+  const inp = document.getElementById('new-mistake');
+  if (!inp?.value.trim()) return;
+  if (!data.settings.mistakes) data.settings.mistakes = [];
+  data.settings.mistakes.push(inp.value.trim());
+  save(); render();
+}
+function removeMistake(i) {
+  data.settings.mistakes.splice(i, 1);
+  save(); render();
+}
+function toggleMistakePill(el) {
+  el.classList.toggle('active');
+  if (el.classList.contains('active')) {
+    el.style.background = 'rgba(232,64,64,0.15)';
+    el.style.borderColor = 'var(--red)';
+    el.style.color = 'var(--red)';
+  } else {
+    el.style.background = '';
+    el.style.borderColor = 'rgba(232,64,64,0.4)';
+    el.style.color = 'var(--muted)';
+  }
+}
+
 function addTag() {
   const inp = document.getElementById('new-tag');
   if (!inp.value.trim()) return;
