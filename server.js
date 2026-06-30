@@ -97,17 +97,24 @@ const server = http.createServer((req, res) => {
   let filePath = path.join(DIR, url === '/' ? '/index.html' : url);
   if (!filePath.startsWith(DIR)) { res.writeHead(403); res.end('Forbidden'); return; }
 
+  // Always force no-cache for HTML so updates show immediately on every device
+  const noCacheHeaders = {
+    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+  };
+
   fs.readFile(filePath, (err, data) => {
     if (err) {
       fs.readFile(path.join(DIR, 'index.html'), (e2, d2) => {
         if (e2) { res.writeHead(500); res.end('Error'); return; }
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', ...noCacheHeaders });
         res.end(d2);
       });
       return;
     }
     const ext = path.extname(filePath);
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'text/plain' });
+    res.writeHead(200, { 'Content-Type': MIME[ext] || 'text/plain', ...noCacheHeaders });
     res.end(data);
   });
 });
