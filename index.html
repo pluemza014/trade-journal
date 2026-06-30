@@ -680,6 +680,7 @@ function render() {
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 
 function getLocalToday() {
+  // Always read a fresh Date() instance — never cache this value
   const now = new Date();
   const y = now.getFullYear();
   const m = String(now.getMonth()+1).padStart(2,'0');
@@ -773,9 +774,8 @@ function calcDisciplineStats(trades) {
 }
 
 // ─── CALENDAR STATE ───────────────────────────────────────────────────────────
-const _now = new Date();
-let calViewYear  = _now.getFullYear();
-let calViewMonth = _now.getMonth(); // 0-indexed
+let calViewYear  = new Date().getFullYear();
+let calViewMonth = new Date().getMonth(); // 0-indexed, always fresh
 
 let calNavMode = false; // true when user has navigated away from period-synced month
 
@@ -794,7 +794,16 @@ function calGoToday() {
   calNavMode = false;
   rerenderCalendarOnly();
   updateDashKPIs();
-}function calJump() {
+}
+
+// Debug helper — run debugToday() in browser console to verify clock
+window.debugToday = function() {
+  const n = new Date();
+  console.log('Browser local time:', n.toString());
+  console.log('Computed getLocalToday():', getLocalToday());
+  console.log('Timezone offset (min):', n.getTimezoneOffset());
+  return getLocalToday();
+};function calJump() {
   const sel = document.getElementById('cal-jump');
   if (!sel) return;
   const [y, m] = sel.value.split('-');
@@ -2542,6 +2551,23 @@ function toast(msg) {
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 render();
 renderAcctBtn();
+
+// Auto-detect day rollover (e.g. tab left open past midnight) and refresh calendar
+let _trackedToday = getLocalToday();
+setInterval(() => {
+  const nowToday = getLocalToday();
+  if (nowToday !== _trackedToday) {
+    _trackedToday = nowToday;
+    // If user hasn't manually navigated away from "today", snap calendar forward
+    if (!calNavMode) {
+      const n = new Date();
+      calViewYear  = n.getFullYear();
+      calViewMonth = n.getMonth();
+    }
+    rerenderCalendarOnly();
+    if (activeTab === 'dashboard') updateDashKPIs();
+  }
+}, 30000); // check every 30s
 </script>
 </body>
 </html>
