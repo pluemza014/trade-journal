@@ -2171,7 +2171,7 @@ function renderModal() {
         <div class="field"><label>Position size</label><input type="number" step="any" id="f-size" value="${t.size||1}"></div>
         <div class="field"><label>R:R achieved</label><input type="number" step="0.1" id="f-rr" value="${t.rr??''}"></div>
         <div class="field"><label>Outcome</label>
-          <select id="f-outcome" onchange="liveUpdateTab(this.value)">
+          <select id="f-outcome" onchange="liveUpdateTab(this.value);updateNetPnl()">
             <option ${t.outcome==='Win'?'selected':''}>Win</option>
             <option ${t.outcome==='Loss'?'selected':''}>Loss</option>
             <option ${t.outcome==='BE'?'selected':''}>BE</option>
@@ -2302,13 +2302,21 @@ function updateNetPnl() {
   const gross = safeEvalMath(grossRaw);
   const comm  = parseFloat(document.getElementById('f-commission')?.value) || 0;
   const fees  = parseFloat(document.getElementById('f-fees')?.value) || 0;
-  const net = gross - Math.abs(comm) - Math.abs(fees);
+  const outcome = document.getElementById('f-outcome')?.value || 'Win';
+  const costs = Math.abs(comm) + Math.abs(fees);
+  // Net magnitude: for losses, commission/fees deepen the loss (add to magnitude).
+  // For wins/BE, commission/fees eat into the gain (subtract from magnitude, floor at 0).
+  const grossAbs = Math.abs(gross);
+  const netMagnitude = outcome === 'Loss' ? grossAbs + costs : Math.max(0, grossAbs - costs);
+  // Store pnl as a signed value for display purposes here, but the canonical magnitude
+  // (what gets saved) is always positive — pnlFromOutcome() re-applies sign app-wide.
   const hidden = document.getElementById('f-pnl');
-  if (hidden) hidden.value = net;
+  if (hidden) hidden.value = netMagnitude;
+  const signedNet = outcome === 'Loss' ? -netMagnitude : netMagnitude;
   const display = document.getElementById('net-pnl-display');
   if (display) {
-    display.textContent = (net >= 0 ? '+' : '') + net.toFixed(2);
-    display.style.color = net >= 0 ? 'var(--green)' : 'var(--red)';
+    display.textContent = (signedNet > 0 ? '+' : '') + signedNet.toFixed(2);
+    display.style.color = signedNet >= 0 ? 'var(--green)' : 'var(--red)';
   }
   // Show the computed gross sum next to the expression, if it's a multi-term expression
   const sumHint = document.getElementById('gross-sum-hint');
