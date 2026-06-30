@@ -1064,19 +1064,24 @@ function buildCalendarGrid(trades, hideMonthly, periodFrom, periodTo) {
   const firstDow = firstDay.getDay(); // 0=Sun
   const calStart = new Date(year, month, 1 - firstDow);
 
+  // Local-date formatter — NEVER use toISOString() for calendar dates (it converts to UTC)
+  function toLocalDateStr(d) {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
   let gridRows = '';
   let weekNum  = 1;
   let cur_date = new Date(calStart);
 
   while (true) {
-    const rowSunStr = cur_date.toISOString().slice(0,10);
+    const rowSunStr = toLocalDateStr(cur_date);
     if (rowSunStr > lastOfMonth) break;
 
-    // All 7 dates for this week (Sun=0 … Sat=6)
+    // All 7 dates for this week (Sun=0 … Sat=6) — built using local date math
     const week7 = [];
     for (let i=0; i<7; i++) {
-      const d = new Date(cur_date); d.setDate(d.getDate()+i);
-      week7.push(d.toISOString().slice(0,10));
+      const d = new Date(cur_date.getFullYear(), cur_date.getMonth(), cur_date.getDate() + i);
+      week7.push(toLocalDateStr(d));
     }
     // DOW 0=Sun, 1=Mon…5=Fri shown as cells; DOW 6=Sat → week summary
     let rowCells = '';
@@ -2026,7 +2031,7 @@ function closeModal() {
 function addTradeTab() {
   // Snapshot current tab first
   snapshotCurrentTab();
-  const date = modalSession[modalActiveIdx]?.date || new Date().toISOString().slice(0,10);
+  const date = modalSession[modalActiveIdx]?.date || getLocalToday();
   modalSession.push(blankTrade(date));
   modalActiveIdx = modalSession.length - 1;
   renderModal();
