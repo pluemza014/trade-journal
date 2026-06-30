@@ -2000,11 +2000,8 @@ function openDayPicker(dateStr, ids) {
 // Calendar cell click — single trade opens edit directly, multiple shows picker
 function calClick(dateStr, ids) {
   const idArr = JSON.parse(ids);
-  if (idArr.length === 1) {
-    openModal(idArr[0]);
-  } else {
-    openDayPicker(dateStr, idArr);
-  }
+  // Open the earliest trade first — use the in-modal ‹ › nav to cycle through others
+  openModal(idArr[0]);
 }
 
 function openModal(id, prefillDate) {
