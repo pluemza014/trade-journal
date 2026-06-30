@@ -206,8 +206,8 @@
   .dpi-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
   /* Multi-trade session tabs */
-  .trade-tabs { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 0; margin-bottom: 1rem; border-bottom: 1px solid var(--border); flex-wrap: nowrap; }
-  .trade-tab { padding: .45rem 1rem; border-radius: var(--radius) var(--radius) 0 0; border: 1px solid transparent; border-bottom: none; background: none; color: var(--muted); font-size: 13px; cursor: pointer; white-space: nowrap; transition: all .15s; position: relative; bottom: -1px; display: flex; align-items: center; gap: 6px; }
+  .trade-tabs { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 0; flex-wrap: nowrap; }
+  .trade-tab { padding: .5rem 1rem; border-radius: var(--radius) var(--radius) 0 0; border: 1px solid transparent; border-bottom: none; background: none; color: var(--muted); font-size: 13px; cursor: pointer; white-space: nowrap; transition: all .15s; display: flex; align-items: center; gap: 6px; line-height: 1; }
   .trade-tab:hover { color: var(--text); background: var(--surface2); }
   .trade-tab.active { background: var(--surface); color: var(--text); border-color: var(--border); border-bottom-color: var(--surface); }
   .trade-tab.tab-loss { --tab-dot: var(--red); }
@@ -216,7 +216,7 @@
   .tab-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tab-dot, var(--muted)); flex-shrink: 0; }
   .tab-close { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 0; margin-left: 2px; }
   .tab-close:hover { color: var(--red); }
-  .add-trade-tab { padding: .45rem .8rem; border-radius: var(--radius) var(--radius) 0 0; border: 1px dashed var(--border2); border-bottom: none; background: none; color: var(--muted); font-size: 13px; cursor: pointer; white-space: nowrap; position: relative; bottom: -1px; }
+  .add-trade-tab { padding: .5rem .8rem; border-radius: var(--radius) var(--radius) 0 0; border: 1px dashed var(--border2); border-bottom: none; background: none; color: var(--muted); font-size: 13px; cursor: pointer; white-space: nowrap; display: flex; align-items: center; line-height: 1; flex-shrink: 0; }
   .add-trade-tab:hover { color: var(--text); }
   .view-btn:hover { color: var(--text); }
   .view-btn.active { background: var(--surface3); color: var(--text); }
@@ -2028,6 +2028,20 @@ function closeModal() {
 function addTradeTab() {
   // Snapshot current tab first
   snapshotCurrentTab();
+
+  // If we were in same-day tab mode (modalSession only has 1 trade, but the day has more),
+  // load ALL same-day trades into modalSession first so they don't get lost.
+  const current = modalSession[modalActiveIdx];
+  if (modalSession.length === 1 && current?.id && current?.date) {
+    const sameDayTrades = data.trades
+      .filter(x => x.date === current.date && x.status === 'Closed')
+      .sort((a,b) => a.id - b.id);
+    if (sameDayTrades.length > 1) {
+      modalSession = sameDayTrades.map(x => ({ ...x, _sid: Math.random().toString(36).slice(2) }));
+      modalActiveIdx = modalSession.findIndex(x => x.id === current.id);
+    }
+  }
+
   const date = modalSession[modalActiveIdx]?.date || getLocalToday();
   modalSession.push(blankTrade(date));
   modalActiveIdx = modalSession.length - 1;
@@ -2074,40 +2088,54 @@ function snapshotCurrentTab() {
 
 function renderModal() {
   const t = modalSession[modalActiveIdx];
-
-  const tabHtml = modalSession.map((tr, i) => {
-    const oc = (tr.outcome || 'win').toLowerCase();
-    const dotClass = oc === 'loss' ? 'tab-loss' : oc === 'be' ? 'tab-be' : 'tab-win';
-    const label = tr.symbol || `Trade ${i+1}`;
-    return `<button class="trade-tab ${dotClass} ${i===modalActiveIdx?'active':''}" onclick="switchTradeTab(${i})">
-      <span class="tab-dot"></span>
-      ${label}
-      ${modalSession.length > 1 ? `<button class="tab-close" onclick="event.stopPropagation();removeTradeTab(${i})">×</button>` : ''}
-    </button>`;
-  }).join('');
-
   const isEdit = modalMode === 'edit' && modalSession.length === 1 && t.id;
-  const titleText = isEdit ? `Edit trade — ${t.symbol}` : `New trade session`;
 
-  // Find same-day trades for navigation when editing
-  let sameDayNav = '';
+  // When editing a single trade, show ALL same-day trades as tabs (clickable to jump directly)
+  let sameDayTrades = [];
   if (isEdit && t.date) {
-    const sameDayTrades = data.trades
+    sameDayTrades = data.trades
       .filter(x => x.date === t.date && x.status === 'Closed')
       .sort((a,b) => a.id - b.id);
-    if (sameDayTrades.length > 1) {
-      const idx = sameDayTrades.findIndex(x => x.id === t.id);
-      const prev = sameDayTrades[idx - 1];
-      const next = sameDayTrades[idx + 1];
-      sameDayNav = `
-        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)">
-          <button class="btn btn-sm" onclick="saveAndNavTrade(${prev?.id ?? 'null'})"
-            style="${!prev ? 'opacity:.3;pointer-events:none' : ''}" title="Previous trade this day">‹</button>
-          <span style="min-width:40px;text-align:center">${idx+1} / ${sameDayTrades.length}</span>
-          <button class="btn btn-sm" onclick="saveAndNavTrade(${next?.id ?? 'null'})"
-            style="${!next ? 'opacity:.3;pointer-events:none' : ''}" title="Next trade this day">›</button>
-        </div>`;
-    }
+  }
+  const useSameDayTabs = sameDayTrades.length > 1;
+
+  const tabHtml = useSameDayTabs
+    ? sameDayTrades.map((x) => {
+        const oc = (x.outcome || 'win').toLowerCase();
+        const dotClass = oc === 'loss' ? 'tab-loss' : oc === 'be' ? 'tab-be' : 'tab-win';
+        const isActive = x.id === t.id;
+        return `<button class="trade-tab ${dotClass} ${isActive ? 'active' : ''}" onclick="saveAndNavTrade(${x.id})">
+          <span class="tab-dot"></span>
+          ${x.symbol}
+        </button>`;
+      }).join('')
+    : modalSession.map((tr, i) => {
+        const oc = (tr.outcome || 'win').toLowerCase();
+        const dotClass = oc === 'loss' ? 'tab-loss' : oc === 'be' ? 'tab-be' : 'tab-win';
+        const label = tr.symbol || `Trade ${i+1}`;
+        return `<button class="trade-tab ${dotClass} ${i===modalActiveIdx?'active':''}" onclick="switchTradeTab(${i})">
+          <span class="tab-dot"></span>
+          ${label}
+          ${modalSession.length > 1 && !tr.id ? `<button class="tab-close" onclick="event.stopPropagation();removeTradeTab(${i})">×</button>` : ''}
+        </button>`;
+      }).join('');
+
+  const titleText = isEdit ? `Edit trade — ${t.symbol}` : `New trade session`;
+
+  // Prev/next nav for the header (only relevant when same-day tabs are active)
+  let sameDayNav = '';
+  if (useSameDayTabs) {
+    const idx  = sameDayTrades.findIndex(x => x.id === t.id);
+    const prev = sameDayTrades[idx - 1];
+    const next = sameDayTrades[idx + 1];
+    sameDayNav = `
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)">
+        <button class="btn btn-sm" onclick="saveAndNavTrade(${prev?.id ?? 'null'})"
+          style="${!prev ? 'opacity:.3;pointer-events:none' : ''}" title="Previous trade this day">‹</button>
+        <span style="min-width:40px;text-align:center">${idx+1} / ${sameDayTrades.length}</span>
+        <button class="btn btn-sm" onclick="saveAndNavTrade(${next?.id ?? 'null'})"
+          style="${!next ? 'opacity:.3;pointer-events:none' : ''}" title="Next trade this day">›</button>
+      </div>`;
   }
 
   document.getElementById('modal-box').innerHTML = `
@@ -2120,8 +2148,8 @@ function renderModal() {
     </div>
 
     <!-- Trade tabs -->
-    <div style="display:flex;align-items:flex-end;gap:4px;margin-bottom:0">
-      <div class="trade-tabs" id="trade-tabs">${tabHtml}</div>
+    <div style="display:flex;align-items:center;gap:4px;margin-bottom:1rem;border-bottom:1px solid var(--border);padding-bottom:0">
+      <div class="trade-tabs" id="trade-tabs" style="display:flex;align-items:center">${tabHtml}</div>
       <button class="add-trade-tab" onclick="addTradeTab()" title="Add another trade">＋ Add trade</button>
     </div>
 
